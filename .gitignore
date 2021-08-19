@@ -1,0 +1,13 @@
+*~
+#*#
+__pycache__/
+.pytest_cache/
+*.blend?*
+*.egg-info/
+build/
+_build/
+dist/
+.coverage
+htmlcov/
+error.log
+docs/manual/readme.md
