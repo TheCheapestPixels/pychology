@@ -402,10 +402,10 @@ class Chain(Multinode):
 
 class Priorities(Multinode):
     """
-    The Priorities (a.k.a. Selector) node has two or more children, and
-    when called, runs them in order of priority until one has not 
-    FAILED. If all fail, so does this node, otherwise it returns what
-    the successful node returns (ACTIVE or DONE).
+    The Priorities (a.k.a. Selector, or Fallback) node has two or more
+    children, and when called, runs them in order of priority until one
+    has not FAILED. If all fail, so does this node, otherwise it returns
+    what the successful node returns (ACTIVE or DONE).
     """
     def __init__(self, *children):
         self.active_child = None
@@ -426,6 +426,32 @@ class Priorities(Multinode):
             previous_child.reset()
         self.active_child = None
         return NodeState.FAILED
+
+
+class Parallel(Multinode):
+    """
+    The Parallel node has two or more children, and when called, runs
+    all of them on each tick. If any of them fail, this node returns
+    FAILED, and when all children are finished, it returns DONE.
+    """
+    def __init__(self, *children):
+        self.children = children
+
+    def __call__(self, entity, *args, **kwargs):
+        rvs = [c(entity, *args, **kwargs) for c in self.children]
+        if any([rv == NodeState.FAILED for rv in rvs]):
+            for child in self.children:
+                child.reset()
+            return NodeState.FAILED
+        if all([rv == NodeState.DONE for rv in rvs]):
+            for child in self.children:
+                child.reset()
+            return NodeState.DONE
+        return NodeState.ACTIVE
+
+    def reset(self):
+        for child in self.children:
+            child.reset()
 
 
 ### Action

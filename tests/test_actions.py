@@ -236,7 +236,7 @@ def test_counter_decorators(decorator_class, action, end_state, calls):
 
 from pychology.behavior_trees import Chain
 from pychology.behavior_trees import Priorities
-
+from pychology.behavior_trees import Parallel
 
 
 @pytest.mark.parametrize(
@@ -284,6 +284,33 @@ def test_priorities(action_a, action_b, end_state, calls_a, calls_b):
     a = action_a()
     b = action_b()
     node = Priorities(
+        a,
+        b,
+    )
+
+    assert node(0) == end_state
+    assert a.times_called == calls_a
+    assert b.times_called == calls_b
+
+
+@pytest.mark.parametrize(
+    'action_a, action_b, end_state, calls_a, calls_b',
+    [
+        (return_active, return_active, NodeState.ACTIVE, 1, 1),
+        (return_active, return_done,   NodeState.ACTIVE, 1, 1),
+        (return_active, return_failed, NodeState.FAILED, 1, 1),
+        (return_done,   return_active, NodeState.ACTIVE, 1, 1),
+        (return_done,   return_done,   NodeState.DONE,   1, 1),
+        (return_done,   return_failed, NodeState.FAILED, 1, 1),
+        (return_failed, return_active, NodeState.FAILED, 1, 1),
+        (return_failed, return_done,   NodeState.FAILED, 1, 1),
+        (return_failed, return_failed, NodeState.FAILED, 1, 1),
+    ],
+)
+def test_parallel(action_a, action_b, end_state, calls_a, calls_b):
+    a = action_a()
+    b = action_b()
+    node = Parallel(
         a,
         b,
     )
