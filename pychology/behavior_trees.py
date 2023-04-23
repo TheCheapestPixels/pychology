@@ -21,6 +21,7 @@ Node
 |  |  +- ReturnFailedOnDone: If tree returns DONE, return FAILED
 |  |  +- ReturnActiveOnFailed: If tree returns FAILED, return ACTIVE
 |  |  +- ReturnDoneOnFailed: If tree returns FAILED, return DONE
+|  +- RewriteReturnValues(active, done, failed, tree): Specify what to rewrite any return value to.
 |  +- Condition(condition_func, tree)
 |  |  +- Precondition: Check condition_func before running the tree, and if true, return...
 |  |  |  +- FailOnPrecondition: FAILED
@@ -42,11 +43,12 @@ Node
 +- Multinode(*trees)
 |  +- Chain: Run one tree after another until each is DONE. Return FAILED if any tree fails.
 |  +- Priorities: Run trees in order until one does not return FAILED.
+|  +- Parallel: Run all trees, fail if any has FAILED, succeed when all are DONE.
 +- Action(action_func): Run the action_func
 """
 
 
-# Leaf states
+### Leaf states
 
 class NodeState(enum.Enum):
     """
@@ -63,7 +65,7 @@ class NodeState(enum.Enum):
     DONE = 3
 
 
-# Behavior Trees
+### Behavior Trees
 
 class BehaviorTree:
     """
@@ -106,7 +108,7 @@ class BehaviorTree:
         return NodeState.DONE
 
 
-# Basic Node types
+### Basic Node types
 
 class Node:
     """
@@ -129,21 +131,6 @@ class Decorator(Node):
 
     def reset(self):
         self.tree.reset()
-
-
-class FailOnCondition:
-    def reaction(self):
-        return NodeState.FAILED
-    
-
-class ActiveOnCondition:
-    def reaction(self):
-        return NodeState.ACTIVE
-    
-
-class DoneOnCondition:
-    def reaction(self):
-        return NodeState.DONE
 
 
 # Debug Decorators
@@ -198,6 +185,21 @@ class RewriteArguments(Decorator):
 
 
 # Return value rewriting
+
+class ActiveOnCondition:
+    def reaction(self):
+        return NodeState.ACTIVE
+    
+
+class DoneOnCondition:
+    def reaction(self):
+        return NodeState.DONE
+
+
+class FailOnCondition:
+    def reaction(self):
+        return NodeState.FAILED
+
 
 class ReturnValueAlways(Decorator):
     def __init__(self, tree):
@@ -257,6 +259,23 @@ class ReturnActiveOnDone(ReturnValueOnDone, ActiveOnCondition): pass
 class ReturnFailedOnDone(ReturnValueOnDone, FailOnCondition): pass
 class ReturnActiveOnFailed(ReturnValueOnFailed, ActiveOnCondition): pass
 class ReturnDoneOnFailed(ReturnValueOnFailed, DoneOnCondition): pass
+
+
+class RewriteReturnValues(Decorator):
+    def __init__(self, active, done, failed, tree):
+        self.on_active = active
+        self.on_done = done
+        self.on_failed = failed
+        self.tree = tree
+
+    def __call__(self, entity, *args, **kwargs):
+        rv = self.tree(entity, *args, **kwargs)
+        if rv == NodeState.DONE:
+            return self.on_done
+        elif rv == NodeState.ACTIVE:
+            return self.on_active
+        else:  # rv == NodeState.FAILED:
+            return self.on_failed
 
 
 # Condition Decorators

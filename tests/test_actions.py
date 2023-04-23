@@ -172,8 +172,104 @@ from pychology.behavior_trees import ReturnDoneOnFailed
         (  ReturnDoneOnFailed, return_failed, NodeState.DONE),
     ],
 )
-def test_return_value_rewriting_decorator(decorator_class, action, end_state):
+def test_return_single_value_rewriting_decorator(decorator_class, action, end_state):
     node = decorator_class(Action(action()))
+    assert node(0) == end_state
+
+
+from pychology.behavior_trees import RewriteReturnValues
+
+
+@pytest.mark.parametrize(
+    'active, done, failed, action, end_state',
+    [
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.ACTIVE, return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.ACTIVE, return_done,   NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.DONE,   return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.DONE,   return_done,   NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.FAILED, return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.FAILED, return_done,   NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.ACTIVE, NodeState.FAILED, return_failed, NodeState.FAILED),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.ACTIVE, return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.ACTIVE, return_done,   NodeState.DONE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.DONE,   return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.DONE,   return_done,   NodeState.DONE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.FAILED, return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.FAILED, return_done,   NodeState.DONE),
+        (NodeState.ACTIVE, NodeState.DONE,   NodeState.FAILED, return_failed, NodeState.FAILED),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.ACTIVE, return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.ACTIVE, return_done,   NodeState.FAILED),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.DONE,   return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.DONE,   return_done,   NodeState.FAILED),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.FAILED, return_active, NodeState.ACTIVE),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.FAILED, return_done,   NodeState.FAILED),
+        (NodeState.ACTIVE, NodeState.FAILED, NodeState.FAILED, return_failed, NodeState.FAILED),
+
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.ACTIVE, return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.ACTIVE, return_done,   NodeState.ACTIVE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.DONE,   return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.DONE,   return_done,   NodeState.ACTIVE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.FAILED, return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.FAILED, return_done,   NodeState.ACTIVE),
+        (NodeState.DONE,   NodeState.ACTIVE, NodeState.FAILED, return_failed, NodeState.FAILED),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.ACTIVE, return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.ACTIVE, return_done,   NodeState.DONE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.DONE,   return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.DONE,   return_done,   NodeState.DONE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.FAILED, return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.FAILED, return_done,   NodeState.DONE),
+        (NodeState.DONE,   NodeState.DONE,   NodeState.FAILED, return_failed, NodeState.FAILED),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.ACTIVE, return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.ACTIVE, return_done,   NodeState.FAILED),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.DONE,   return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.DONE,   return_done,   NodeState.FAILED),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.FAILED, return_active, NodeState.DONE),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.FAILED, return_done,   NodeState.FAILED),
+        (NodeState.DONE,   NodeState.FAILED, NodeState.FAILED, return_failed, NodeState.FAILED),
+
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.ACTIVE, return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.ACTIVE, return_done,   NodeState.ACTIVE),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.DONE,   return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.DONE,   return_done,   NodeState.ACTIVE),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.FAILED, return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.FAILED, return_done,   NodeState.ACTIVE),
+        (NodeState.FAILED, NodeState.ACTIVE, NodeState.FAILED, return_failed, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.ACTIVE, return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.ACTIVE, return_done,   NodeState.DONE),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.DONE,   return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.DONE,   return_done,   NodeState.DONE),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.FAILED, return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.FAILED, return_done,   NodeState.DONE),
+        (NodeState.FAILED, NodeState.DONE,   NodeState.FAILED, return_failed, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.ACTIVE, return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.ACTIVE, return_done,   NodeState.FAILED),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.ACTIVE, return_failed, NodeState.ACTIVE),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.DONE,   return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.DONE,   return_done,   NodeState.FAILED),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.DONE,   return_failed, NodeState.DONE),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.FAILED, return_active, NodeState.FAILED),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.FAILED, return_done,   NodeState.FAILED),
+        (NodeState.FAILED, NodeState.FAILED, NodeState.FAILED, return_failed, NodeState.FAILED),
+    ],
+)
+def test_return_multiple_value_rewriting_decorator(active, done, failed, action, end_state):
+    node = RewriteReturnValues(active, done, failed, Action(action()))
     assert node(0) == end_state
 
 

@@ -72,12 +72,17 @@ TODO
   * Packaging
 * Hierarchical Finite State Machines (HFSM): Everything
 * Behavior Trees
-  * Multinodes: Weighted random choice
-  * Decorators: More return value logic
-  * Blackboard support
-  * Debug tools
-  * Visualization
-  * De-/Serialization
+  * Node types
+    * Weighted Random Choice Multinode
+    * Plugin point for adding subtrees at runtime; Might be sensible to
+      have as a universal property?
+  * Blackboard support: Just a decorator working on the entity?
+  * Tooling
+    * De-/Serialization
+    * Debug
+      * Recording activation, return values, and resets frame by frame
+    * Tree visualization and editing in Panda3D
+* Search: Everything
 * Planning
   * Goal-Oriented Action Planning (GOAP): Everything
   * Hierarchical Task Planning (HTN): Everything
