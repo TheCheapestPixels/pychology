@@ -243,7 +243,7 @@ from pychology.behavior_trees import Parallel
     'action_a, action_b, end_state, calls_a, calls_b',
     [
         (return_active, return_active, NodeState.ACTIVE, 1, 0),
-        (return_active, return_active, NodeState.ACTIVE, 1, 0),
+        (return_active, return_done,   NodeState.ACTIVE, 1, 0),
         (return_active, return_failed, NodeState.ACTIVE, 1, 0),
         (return_done,   return_active, NodeState.ACTIVE, 1, 1),
         (return_done,   return_done,   NodeState.DONE,   1, 1),
@@ -270,7 +270,7 @@ def test_chain(action_a, action_b, end_state, calls_a, calls_b):
     'action_a, action_b, end_state, calls_a, calls_b',
     [
         (return_active, return_active, NodeState.ACTIVE, 1, 0),
-        (return_active, return_active, NodeState.ACTIVE, 1, 0),
+        (return_active, return_done,   NodeState.ACTIVE, 1, 0),
         (return_active, return_failed, NodeState.ACTIVE, 1, 0),
         (return_done,   return_active, NodeState.DONE,   1, 0),
         (return_done,   return_done,   NodeState.DONE,   1, 0),
