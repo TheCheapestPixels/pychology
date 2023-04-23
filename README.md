@@ -20,17 +20,18 @@ that it returns one of the above mentioned node states, namely
 `NodeState.ACTIVE`, `NodeState.DONE`, or `NodeState.FAILED`. These
 functions then are plugged into `pychology.behavior_trees.Action`.
 
-Inner nodes either have a single child and do some logic; These are
+Inner nodes may have a single child and do some logic; These are
 called decorators, and do a lot of heavy lifting. They can change the
 returning node state, prevent sub-trees from being executed, check for
 conditions, count how often or for how long a sub-tree has been active,
 provide debug information, and much more.
 
-There's also nodes that have multiple children. The two most popular are
-the Chain (usually called Sequence), which executes a series of tasks
-(or rather sub-trees) one after the other, and Priorities (also called
-Selector or Fallback) which tries running one sub-tree after the other
-until one reports something other than failure.
+There's also nodes that (can) have multiple children. The two most
+popular are the Chain (usually called Sequence), which executes a series
+of tasks (or rather sub-trees) one after the other, and Priorities (also
+called Selector or Fallback) which tries running one sub-tree after the
+other until one reports something other than failure. Another node type
+is Parallel, which executes all of its children.
 
 The class `pychology.behavior_trees.BehaviorTree` can act as a root node
 that automatically resets the tree's state after it has finished or
@@ -69,15 +70,15 @@ TODO
 
 * Project
   * Packaging
+* Hierarchical Finite State Machines (HFSM): Everything
 * Behavior Trees
-  * Multinodes: Parallel, weighted random choice
+  * Multinodes: Weighted random choice
   * Decorators: More return value logic
   * Blackboard support
   * Debug tools
   * Visualization
   * De-/Serialization
-  * Tests
-* Hierarchical Finite State Machines (HFSM): Everything
-* Goal-Oriented Action Planning (GOAP): Everything
-* Hierarchical Task Planning (HTN): Everything
+* Planning
+  * Goal-Oriented Action Planning (GOAP): Everything
+  * Hierarchical Task Planning (HTN): Everything
 * [Whatever this is](https://www.youtube.com/watch?v=Z-xU96pAuqs)
