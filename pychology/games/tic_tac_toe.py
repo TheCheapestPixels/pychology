@@ -1,5 +1,6 @@
 X = 1
 O = 2
+DRAW = 3
 
 lines = [
     [0, 1, 2],
@@ -24,10 +25,14 @@ def initial_state():
 
 def game_winner(state):
     board = state['board']
+    # Proper winner
     for player in [X, O]:
         for line in lines:
             if all(board[tile] == player for tile in line):
                 return player
+    # Draw
+    if all(t in [X, O] for t in board):
+        return DRAW
     return None
 
 
@@ -58,22 +63,27 @@ def make_move(state, moves):
 ### User interaction
 
 def visualize_state(state):
-    def tile(p):
+    def tile(p, idx=None):
         if p == X:
-            return ' X '
+            return " X "
         elif p == O:
-            return ' O '
+            return " O "
         else:
-            return '   '
+            if idx is None:
+                return "   "
+            else:
+                return f" {str(idx)} "
     board = state['board']
-    v = [tile(b) for b in board]
+    v = [tile(b, idx=idx) for idx, b in enumerate(board)]
     winner = game_winner(state)
     print(f"{v[0]}|{v[1]}|{v[2]}\n---+---+---\n{v[3]}|{v[4]}|{v[5]}\n---+---+---\n{v[6]}|{v[7]}|{v[8]}")
     if winner is not None:
         if winner == X:
             print(f"Winner: X")
-        else:
+        elif winner == O:
             print(f"Winner: O")
+        else:  # winner == DRAW
+            print("Game ended in a draw.")
     else:
         if state['player'] == X:
             print(f"Move: X")
@@ -98,7 +108,7 @@ def query_action(moves):
 
 
 def query_ai_players():
-    print(f"Should I play X, O, or XO (both?)")
+    print(f"Should I play X, O, XO (both), or N (neither)?")
     ai_players = None
     while ai_players is None:
         i = input("> ")
@@ -108,19 +118,21 @@ def query_ai_players():
             ai_players = [O]
         elif i in ['XO', 'xo']:
             ai_players = [X, O]
+        elif i in ['N', 'n']:
+            ai_players = []
         else:
-            print("Please enter X, O, or XO.")
+            print("Please enter X, O, XO, or N.")
     return ai_players
 
 
-if __name__ == '__main__':
+###
 
-    ai_players = query_ai_players()
-    state = initial_state()
-
+def repl(state, ai_players, visuals=True):
     while True:
-        visualize_state(state)
-        if game_winner(state) is not None:
+        if visuals:
+            visualize_state(state)
+        winner = game_winner(state)
+        if winner is not None:
             break
 
         moves = legal_moves(state)
@@ -132,3 +144,26 @@ if __name__ == '__main__':
                 import random
                 actions[player] = random.choice(player_moves)
         state = make_move(state, actions)
+    return winner
+
+
+### Main program
+
+def play_interactively():
+    ai_players = query_ai_players()
+    state = initial_state()
+    repl(state, ai_players)
+
+
+def auto_tournament():
+    results = {X: 0, O: 0, DRAW: 0}
+    ai_players = [X, O]
+    for _ in range(100000):
+        state = initial_state()
+        results[repl(state, ai_players, visuals=False)] += 1
+    print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
+
+
+if __name__ == '__main__':
+    play_interactively()
+    #auto_tournament()
