@@ -42,7 +42,9 @@ def legal_moves(state):
     for idx, tile_state in enumerate(state['board']):
         if tile_state is None:
             moves.append(idx)
-    return {state['player']: moves}
+    all_players_moves = {X: [], O: []}
+    all_players_moves[state['player']] = moves
+    return all_players_moves
 
 
 def make_move(state, moves):
@@ -104,6 +106,7 @@ def query_action(moves):
             print("Invalid move.")
         else:
             break
+    print()
     return choice
 
 
@@ -125,45 +128,11 @@ def query_ai_players():
     return ai_players
 
 
-###
-
-def repl(state, ai_players, visuals=True):
-    while True:
-        if visuals:
-            visualize_state(state)
-        winner = game_winner(state)
-        if winner is not None:
-            break
-
-        moves = legal_moves(state)
-        actions = {}
-        for player, player_moves in moves.items():
-            if player not in ai_players:
-                actions[player] = query_action(player_moves)
-            else:
-                import random
-                actions[player] = random.choice(player_moves)
-        state = make_move(state, actions)
-    return winner
-
-
-### Main program
-
-def play_interactively():
-    ai_players = query_ai_players()
-    state = initial_state()
-    repl(state, ai_players)
-
-
-def auto_tournament():
-    results = {X: 0, O: 0, DRAW: 0}
-    ai_players = [X, O]
-    for _ in range(100000):
-        state = initial_state()
-        results[repl(state, ai_players, visuals=False)] += 1
-    print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
-
-
-if __name__ == '__main__':
-    play_interactively()
-    #auto_tournament()
+class Game:
+    initial_state = initial_state
+    game_winner = game_winner
+    legal_moves = legal_moves
+    make_move = make_move
+    query_ai_players = query_ai_players
+    visualize_state = visualize_state
+    query_action = query_action
