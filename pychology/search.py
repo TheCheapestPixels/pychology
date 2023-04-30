@@ -77,6 +77,7 @@
 
 import random
 import itertools
+from collections import defaultdict
 
 
 class RandomChooser:
@@ -96,13 +97,45 @@ class RandomChooser:
 
 class Search:
     def __init__(self, game, state, player):
-        self.expansion_queue = [state]
         self.game = game
-        self.state = state
         self.player = player
+        self.setup_storage()
+        self.store_state(state)
+
+    def setup_storage(self):
+        self.known_states = {}  # hash -> state
+        self.expansion_queue = []  # hashes
+        self.terminal_states = {}  # hash -> winner
+        self.children = defaultdict(list)  # hash -> [(hash, action)]
+        self.parents = defaultdict(list)  # hash -> [(hash, action)]
+        self.value = {}  # hash -> value
+        
+
+    def store_state(self, state):
+        """
+        Returns a `(nonterminal, outcome)` tuple. If the state is
+        terminal, the outcome is returned, otherwise it is False."""
+        state_hash = self.game.hash_state(state)
+        # If the state is known already, no need for further processing.
+        if state_hash in self.known_states:
+            terminal = state_hash in self.terminal_states
+            if terminal:
+                outcome = self.terminal_states[state_hash]
+            else:
+                outcome = False
+            return (terminal, outcome)
+        self.known_states[state_hash] = state
+        winner = self.game.game_winner(state)
+        if winner is None:
+            self.expansion_queue.append(state_hash)
+            return (True, False)
+        else:
+            self.terminal_states[state_hash] = winner
+            return (False, winner)
 
     def select_state_to_expand(self):
-        state = self.expansion_queue.pop(0)
+        state_hash = self.expansion_queue.pop(0)
+        state = self.known_states[state_hash]
         return state
 
     def get_expanding_actions(self, state):
@@ -126,20 +159,34 @@ class Search:
         # Select node to expand
         state = self.select_state_to_expand()
         # Choose expansions
-        moves = self.get_expanding_actions(state)
-        successors = [self.game.make_move(state, m) for m in moves]
-        import pdb; pdb.set_trace()
+        actions = self.get_expanding_actions(state)
+        for action in actions:
+            successor = self.game.make_move(state, action)
+            (nonterminal, outcome) = self.store_state(successor)
+            # Store transpositions
+            state_hash = self.game.hash_state(state)
+            successor_hash = self.game.hash_state(successor)
+            self.children[state_hash].append((successor_hash, action))
+            self.parents[successor_hash].append((state_hash, action))
+            # Do other stuff
+            if nonterminal:
+                value = self.game.evaluate_state(state)
         # Evaluate expansions
         # Backpropagate values
         # Done
-        return True
+        return bool(actions)
 
     def select_action(self):
         return action
 
     def run(self):
-        if self.expansion_queue:
-            self.step()
+        import datetime
+        t_0 = datetime.datetime.now()
+        while self.step():
+            pass
+        t_1 = datetime.datetime.now()
+        print((t_1-t_0).total_seconds())
+        import pdb; pdb.set_trace()
         return self.select_action()
 
 
@@ -184,8 +231,7 @@ def repl(game, state, ai_players, visuals=True):
                 if moves:
                     #search = RandomChooser(game, state, player)
                     search = Search(game, state, player)
-                    while search.step():
-                        pass
+                    search.run()
                     actions[player] = search.decide()
                 else:
                     actions[player] = []
@@ -199,18 +245,16 @@ def play_interactively(game):
     repl(game, state, ai_players)
 
 
-def auto_tournament():
-    results = {X: 0, O: 0, DRAW: 0}
-    ai_players = [X, O]
+def auto_tournament(game):
+    results = {k: 0 for k in game.players()}
+    ai_players = game.players()
     for _ in range(10000):
-        state = initial_state()
-        results[repl(state, ai_players, visuals=False)] += 1
+        state = game.initial_state()
+        results[repl(game, state, ai_players, visuals=False)] += 1
     print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
 
 
 if __name__ == '__main__':
     from games.tic_tac_toe import Game
-    play_interactively(Game)
-    #auto_tournament()
-
-
+    #play_interactively(Game)
+    auto_tournament(Game)

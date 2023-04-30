@@ -62,6 +62,26 @@ def make_move(state, moves):
     return new_state
 
 
+### Game-interpreting functions
+
+def players():
+    return [X, O]
+
+def hash_state(state):
+    board = state['board']
+    h = ''.join([{X: 'X', O: 'O', None: ' '}[t] for t in board])
+    return h
+
+def evaluate_state(state):
+    winner = game_winner(state)
+    if winner == X:
+        return {X: 100, O: -100}
+    elif winner == O:
+        return {X: -100, O: 100}
+    else:
+        return {X: 0, O: 0}
+
+
 ### User interaction
 
 def visualize_state(state):
@@ -133,6 +153,9 @@ class Game:
     game_winner = game_winner
     legal_moves = legal_moves
     make_move = make_move
+    players = players
+    hash_state = hash_state
+    evaluate_state = evaluate_state
     query_ai_players = query_ai_players
     visualize_state = visualize_state
     query_action = query_action
