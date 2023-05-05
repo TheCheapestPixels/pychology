@@ -1,6 +1,9 @@
 import math
 
 
+full_hand = [1, 2, 3]
+
+
 ### Game-defining functions
 
 def players():
@@ -9,7 +12,7 @@ def players():
 
 def initial_state():
     players = 3
-    cards = {1: [1,2,3], 2: [1,2,3], 3: [1,2,3]}
+    cards = {p + 1: full_hand.copy() for p in range(players)}
     points = {1: 0, 2: 0, 3: 0}
     dealer = 1
     state = dict(cards=cards, points=points, dealer=dealer)
@@ -61,7 +64,6 @@ def make_move(state, moves):
 
 def hash_state(state):
     hash_str = ""
-    full_hand = [1, 2, 3]
     for hand in state['cards'].values():
         for full in full_hand:
             if full in hand:
