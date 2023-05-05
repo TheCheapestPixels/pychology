@@ -80,25 +80,11 @@ import itertools
 from collections import defaultdict
 
 
-class RandomChooser:
-    def __init__(self, game, state, player):
-        self.game = game
-        self.state = state
-        self.player = player
-
-    def step(self):
-        moves = self.game.legal_moves(self.state)[self.player]
-        self.favorite_move = random.choice(moves)
-        return False
-
-    def decide(self):
-        return self.favorite_move
-
-
 class Search:
     def __init__(self, game, state, player):
         self.game = game
         self.player = player
+        self.current_state = state
         self.setup_storage()
         self.store_state(state)
 
@@ -158,44 +144,101 @@ class Search:
             return False
         # Select node to expand
         state = self.select_state_to_expand()
+        state_hash = self.game.hash_state(state)
         # Choose expansions
         actions = self.get_expanding_actions(state)
         for action in actions:
             successor = self.game.make_move(state, action)
             (nonterminal, outcome) = self.store_state(successor)
             # Store transpositions
-            state_hash = self.game.hash_state(state)
             successor_hash = self.game.hash_state(successor)
             self.children[state_hash].append((successor_hash, action))
             self.parents[successor_hash].append((state_hash, action))
-            # Do other stuff
-            if nonterminal:
-                value = self.game.evaluate_state(state)
-        # Evaluate expansions
-        # Backpropagate values
+            # Evaluate expansions
+            self.value[successor_hash] = self.evaluate_state(successor)
+        # Backpropagate value
+        #self.reevaluate_node(state)
         # Done
         return bool(actions)
 
+    def build_tree(self):
+        raise NotImplementedError
+
+    def evaluate_state(self, state):
+        raise NotImplementedError
+
     def select_action(self):
-        return action
+        raise NotImplementedError
 
     def run(self):
         import datetime
         t_0 = datetime.datetime.now()
-        while self.step():
-            pass
+        self.build_tree()
         t_1 = datetime.datetime.now()
-        print((t_1-t_0).total_seconds())
+        #print((t_1-t_0).total_seconds())
         import pdb; pdb.set_trace()
         return self.select_action()
 
 
+### Modular extensions to the search core.
+
+# Tree expansion
+
+class NoExpansion:
+    def build_tree(self):
+        pass
 
 
+class FullExpansion:
+    def build_tree(self):
+        while self.step():
+            pass
 
 
+# Valuation strategies
+
+class ZeroSumPlayer:
+    """
+    Every point that the player has is counted. Every point that another
+    player has is substracted from that. This is not properly zero sum,
+    but should serve the same effect.
+    """
+    def evaluate_state(self, state):
+        slate = self.game.evaluate_state(state)
+        oppo_slate = [v for p, v in slate.items() if p != self.player]
+        value = slate[self.player] - sum(oppo_slate)
+        return value
 
 
+class RacerPlayer:
+    """
+    If the player is not the one with the most points, the value is how
+    many points behind the maximum score it is (as a negative value). If
+    the player does have first place, the value is how far ahead of the
+    next-valued player it is.
+    """
+    def evaluate_state(self, state):
+        slate = self.game.evaluate_state(state)
+        player_points = slate[self.player]
+        all_points = list(sorted(slate.values()))
+        if player_points == all_points[0]:  # Player leads
+            value = player_points - all_points[1]
+        else:
+            value = player_points - all_points[0]
+        return value
+
+
+# Action choice
+
+class RandomChooser:
+    def select_action(self):
+        options = self.game.legal_moves(self.current_state)[self.player]
+        return random.choice(options)
+
+
+### Complete searches.
+
+class StateOfTheArt(FullExpansion, RacerPlayer, RandomChooser, Search): pass
 
 
 
@@ -224,15 +267,16 @@ def repl(game, state, ai_players, visuals=True):
         for player, player_moves in moves.items():
             if player not in ai_players:
                 if player_moves:
-                    actions[player] = game.query_action(player_moves)
+                    actions[player] = game.query_action(
+                        player,
+                        player_moves,
+                    )
                 else: actions[player] = []
             else:
                 moves = game.legal_moves(state)[player]
                 if moves:
-                    #search = RandomChooser(game, state, player)
-                    search = Search(game, state, player)
-                    search.run()
-                    actions[player] = search.decide()
+                    search = StateOfTheArt(game, state, player)
+                    actions[player] = search.run()
                 else:
                     actions[player] = []
         state = game.make_move(state, actions)
@@ -255,6 +299,7 @@ def auto_tournament(game):
 
 
 if __name__ == '__main__':
-    from games.tic_tac_toe import Game
-    #play_interactively(Game)
-    auto_tournament(Game)
+    #from games.tic_tac_toe import Game
+    from games.ten_trick_take import Game
+    play_interactively(Game)
+    #auto_tournament(Game)

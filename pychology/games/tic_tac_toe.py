@@ -1,3 +1,6 @@
+import math
+
+
 X = 1
 O = 2
 DRAW = 3
@@ -75,9 +78,9 @@ def hash_state(state):
 def evaluate_state(state):
     winner = game_winner(state)
     if winner == X:
-        return {X: 100, O: -100}
+        return {X: math.inf, O: -math.inf}
     elif winner == O:
-        return {X: -100, O: 100}
+        return {X: -math.inf, O: math.inf}
     else:
         return {X: 0, O: 0}
 
@@ -115,7 +118,7 @@ def visualize_state(state):
         print(f"Legal moves: {', '.join(str(m) for m in moves)}")
 
 
-def query_action(moves):
+def query_action(player, moves):
     while True:
         choice = input("Your choice: ")
         try:
