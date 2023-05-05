@@ -78,6 +78,7 @@
 import random
 import itertools
 from collections import defaultdict
+import math
 
 
 class Search:
@@ -95,7 +96,7 @@ class Search:
         self.children = defaultdict(list)  # hash -> [(hash, action)]
         self.parents = defaultdict(list)  # hash -> [(hash, action)]
         self.value = {}  # hash -> value
-        
+        self.opinion = {}  # hash -> ??? FIXME
 
     def store_state(self, state):
         """
@@ -156,15 +157,40 @@ class Search:
             self.parents[successor_hash].append((state_hash, action))
             # Evaluate expansions
             self.value[successor_hash] = self.evaluate_state(successor)
-        # Backpropagate value
-        #self.reevaluate_node(state)
-        # Done
+        # Re-evaluate this node and backpropagate value updates
+        states_to_update = [state_hash]
+        while states_to_update:
+            state_hash = states_to_update.pop(0)
+            state = self.known_states[state_hash]
+            state_value, best_actions = self.reevaluate_node(state)
+            self.opinion[state_hash] = (state_value, best_actions)
+            if state_hash not in self.value:
+                # Apparently this is the root node, and hasn't gotten a
+                # heuristic valuation at the beginning. FIXME: We should
+                # still propagate, as cycles may exist in the graph.
+                self.value[state_hash] = state_value
+            elif self.value[state_hash] != state_value:
+                self.value[state_hash] = state_value
+                for s, a in self.parents[state_hash]:
+                    states_to_update.append(s)
+        # Done. Could this state even be expanded?
         return bool(actions)
 
     def build_tree(self):
         raise NotImplementedError
 
     def evaluate_state(self, state):
+        """
+        Determine the heuristic value of the state, without having to
+        resort to expanded states.
+        """
+        raise NotImplementedError
+
+    def reevaluate_node(self, state):
+        """
+        Determine the actual value of the node based on states expanded
+        from it.
+        """
         raise NotImplementedError
 
     def select_action(self):
@@ -172,11 +198,10 @@ class Search:
 
     def run(self):
         import datetime
-        t_0 = datetime.datetime.now()
+        #t_0 = datetime.datetime.now()
         self.build_tree()
-        t_1 = datetime.datetime.now()
+        #t_1 = datetime.datetime.now()
         #print((t_1-t_0).total_seconds())
-        import pdb; pdb.set_trace()
         return self.select_action()
 
 
@@ -195,7 +220,7 @@ class FullExpansion:
             pass
 
 
-# Valuation strategies
+# State evaluation
 
 class ZeroSumPlayer:
     """
@@ -228,17 +253,51 @@ class RacerPlayer:
         return value
 
 
-# Action choice
+# Action evalution
+
+class Minimax:
+    def reevaluate_node(self, state):
+        score = defaultdict(lambda: math.inf)
+        state_hash = self.game.hash_state(state)
+        for successor_hash, actions in self.children[state_hash]:
+            player_action = actions[self.player]
+            successor_value = self.value[successor_hash]
+            score[player_action] = min(score[player_action], successor_value)
+        state_value = max(score.values())
+        best_actions = [action
+                        for action, points in score.items()
+                        if points==state_value]
+        return state_value, best_actions
+
+
+# Action selection
 
 class RandomChooser:
+    """
+    Chooses randomly among the available moves.
+    """
     def select_action(self):
         options = self.game.legal_moves(self.current_state)[self.player]
         return random.choice(options)
 
+class BestMovePlayer:
+    """
+    """
+    def select_action(self):
+        state_hash = self.game.hash_state(self.current_state)
+        value, actions = self.opinion[state_hash]
+        return random.choice(actions)
+
 
 ### Complete searches.
 
-class StateOfTheArt(FullExpansion, RacerPlayer, RandomChooser, Search): pass
+class StateOfTheArt(
+        FullExpansion,   # Tree expansion: Expand all at once.
+        RacerPlayer,     # State evaluation
+        Minimax,         # Action evaluation
+        BestMovePlayer,  # Action selection
+        Search,
+): pass
 
 
 
@@ -290,16 +349,19 @@ def play_interactively(game):
 
 
 def auto_tournament(game):
-    results = {k: 0 for k in game.players()}
+    X=1
+    O=2
+    DRAW=3
+    results = {k: 0 for k in [1,2,3]} #game.players()}
     ai_players = game.players()
-    for _ in range(10000):
+    for _ in range(100):
         state = game.initial_state()
         results[repl(game, state, ai_players, visuals=False)] += 1
     print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
 
 
 if __name__ == '__main__':
-    #from games.tic_tac_toe import Game
-    from games.ten_trick_take import Game
+    from games.tic_tac_toe import Game
+    #from games.ten_trick_take import Game
     play_interactively(Game)
     #auto_tournament(Game)
