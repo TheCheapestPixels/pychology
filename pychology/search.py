@@ -96,7 +96,7 @@ class Search:
         self.children = defaultdict(list)  # hash -> [(hash, action)]
         self.parents = defaultdict(list)  # hash -> [(hash, action)]
         self.value = {}  # hash -> value
-        self.opinion = {}  # hash -> ??? FIXME
+        self.opinion = {}  # hash -> (value, [action])
 
     def store_state(self, state):
         """
@@ -220,6 +220,12 @@ class FullExpansion:
             pass
 
 
+class LimitedExpansion:
+    def build_tree(self):
+        while self.step() and len(self.known_states) < self.node_limit:
+            pass
+
+
 # State evaluation
 
 class ZeroSumPlayer:
@@ -292,23 +298,13 @@ class BestMovePlayer:
 ### Complete searches.
 
 class StateOfTheArt(
-        FullExpansion,   # Tree expansion: Expand all at once.
-        RacerPlayer,     # State evaluation
-        Minimax,         # Action evaluation
-        BestMovePlayer,  # Action selection
+        LimitedExpansion,  # Tree expansion
+        RacerPlayer,       # State evaluation
+        Minimax,           # Action evaluation
+        BestMovePlayer,    # Action selection
         Search,
-): pass
-
-
-
-
-
-
-
-
-
-
-
+):
+    node_limit = 100  # LimitedExpansion
 
 
 ### Game-independent core; REPL and run stub.
