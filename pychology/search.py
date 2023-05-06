@@ -304,7 +304,7 @@ class StateOfTheArt(
         BestMovePlayer,    # Action selection
         Search,
 ):
-    node_limit = 100  # LimitedExpansion
+    node_limit = 10000  # LimitedExpansion
 
 
 ### Game-independent core; REPL and run stub.
@@ -357,7 +357,8 @@ def auto_tournament(game):
 
 
 if __name__ == '__main__':
-    from games.tic_tac_toe import Game
+    #from games.tic_tac_toe import Game
     #from games.ten_trick_take import Game
+    from games.four_in_a_row import Game
     play_interactively(Game)
     #auto_tournament(Game)
