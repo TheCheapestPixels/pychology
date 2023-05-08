@@ -90,55 +90,26 @@ class Search:
         self.store_state(state)
 
     def setup_storage(self):
-        self.known_states = {}  # hash -> state
-        self.expansion_queue = []  # hashes
-        self.terminal_states = {}  # hash -> winner
-        self.children = defaultdict(list)  # hash -> [(hash, action)]
-        self.parents = defaultdict(list)  # hash -> [(hash, action)]
-        self.value = {}  # hash -> value
-        self.opinion = {}  # hash -> (value, [action])
+        raise NotImplementedError
 
     def store_state(self, state):
         """
         Returns a `(nonterminal, outcome)` tuple. If the state is
-        terminal, the outcome is returned, otherwise it is False."""
-        state_hash = self.game.hash_state(state)
-        # If the state is known already, no need for further processing.
-        if state_hash in self.known_states:
-            terminal = state_hash in self.terminal_states
-            if terminal:
-                outcome = self.terminal_states[state_hash]
-            else:
-                outcome = False
-            return (terminal, outcome)
-        self.known_states[state_hash] = state
-        winner = self.game.game_winner(state)
-        if winner is None:
-            self.expansion_queue.append(state_hash)
-            return (True, False)
-        else:
-            self.terminal_states[state_hash] = winner
-            return (False, winner)
+        terminal, the outcome is returned, otherwise it is False.
+        """
+        raise NotImplementedError
+
+    def store_transition(self, state, action, successor):
+        raise NotImplementedError
 
     def select_state_to_expand(self):
+        # FIXME: This relies on the TranspositionTable storage.
         state_hash = self.expansion_queue.pop(0)
         state = self.known_states[state_hash]
         return state
 
     def get_expanding_actions(self, state):
-        moves = self.game.legal_moves(state)
-        players = list(moves.keys())
-        # Some players may not have any move available. The basic
-        # product of moves would thus contain no moves. So here we use
-        # None to fake a "pass" move.
-        for k in moves.keys():
-            if not moves[k]:
-                moves[k] = [None]
-        # Now we figure out all possible combinations...
-        combos = list(itertools.product(*[moves[p] for p in players]))
-        # ...and turn them back into move format.
-        combos = [dict(zip(players, combi)) for combi in combos]
-        return combos
+        raise NotImplementedError
 
     def step(self):
         if not self.expansion_queue:  # Queue is empty
@@ -150,11 +121,10 @@ class Search:
         actions = self.get_expanding_actions(state)
         for action in actions:
             successor = self.game.make_move(state, action)
+            successor_hash = self.game.hash_state(successor)
             (nonterminal, outcome) = self.store_state(successor)
             # Store transpositions
-            successor_hash = self.game.hash_state(successor)
-            self.children[state_hash].append((successor_hash, action))
-            self.parents[successor_hash].append((state_hash, action))
+            self.store_transition(state, action, successor)
             # Evaluate expansions
             self.value[successor_hash] = self.evaluate_state(successor)
         # Re-evaluate this node and backpropagate value updates
@@ -198,14 +168,55 @@ class Search:
 
     def run(self):
         import datetime
-        #t_0 = datetime.datetime.now()
+        t_0 = datetime.datetime.now()
         self.build_tree()
-        #t_1 = datetime.datetime.now()
+        t_1 = datetime.datetime.now()
         #print((t_1-t_0).total_seconds())
         return self.select_action()
 
 
 ### Modular extensions to the search core.
+
+# Storage
+
+class TranspositionTable:
+    def setup_storage(self):
+        self.known_states = {}  # hash -> state
+        self.expansion_queue = []  # hashes
+        self.terminal_states = {}  # hash -> winner
+        self.children = defaultdict(list)  # hash -> [(hash, action)]
+        self.parents = defaultdict(list)  # hash -> [(hash, action)]
+        self.value = {}  # hash -> value
+        self.opinion = {}  # hash -> (value, [action])
+
+    def store_state(self, state):
+        """
+        Returns a `(nonterminal, outcome)` tuple. If the state is
+        terminal, the outcome is returned, otherwise it is False."""
+        state_hash = self.game.hash_state(state)
+        # If the state is known already, no need for further processing.
+        if state_hash in self.known_states:
+            terminal = state_hash in self.terminal_states
+            if terminal:
+                outcome = self.terminal_states[state_hash]
+            else:
+                outcome = False
+            return (terminal, outcome)
+        self.known_states[state_hash] = state
+        winner = self.game.game_winner(state)
+        if winner is None:
+            self.expansion_queue.append(state_hash)
+            return (True, False)
+        else:
+            self.terminal_states[state_hash] = winner
+            return (False, winner)
+
+    def store_transition(self, state, action, successor):
+        state_hash = self.game.hash_state(state)
+        successor_hash = self.game.hash_state(successor)
+        self.children[state_hash].append((successor_hash, action))
+        self.parents[successor_hash].append((state_hash, action))
+
 
 # Tree expansion
 
@@ -224,6 +235,25 @@ class LimitedExpansion:
     def build_tree(self):
         while self.step() and len(self.known_states) < self.node_limit:
             pass
+
+
+# Action expansion
+
+class AllCombinations:
+    def get_expanding_actions(self, state):
+        moves = self.game.legal_moves(state)
+        players = list(moves.keys())
+        # Some players may not have any move available. The basic
+        # product of moves would thus contain no moves. So here we use
+        # None to fake a "pass" move.
+        for k in moves.keys():
+            if not moves[k]:
+                moves[k] = [None]
+        # Now we figure out all possible combinations...
+        combos = list(itertools.product(*[moves[p] for p in players]))
+        # ...and turn them back into move format.
+        combos = [dict(zip(players, combi)) for combi in combos]
+        return combos
 
 
 # State evaluation
@@ -298,18 +328,47 @@ class BestMovePlayer:
 ### Complete searches.
 
 class StateOfTheArt(
-        LimitedExpansion,  # Tree expansion
-        RacerPlayer,       # State evaluation
-        Minimax,           # Action evaluation
-        BestMovePlayer,    # Action selection
+        TranspositionTable,  # Storage
+        LimitedExpansion,    # Tree expansion
+        AllCombinations,     # Action expansion
+        ZeroSumPlayer,       # State evaluation
+        Minimax,             # Action evaluation
+        BestMovePlayer,      # Action selection
         Search,
 ):
-    node_limit = 10000  # LimitedExpansion
+    node_limit = 1000  # LimitedExpansion
+
+
+def plies(n):
+    # n=0 would not consider the possible successors at all.
+    # n=1 would only detect immediately winning moves.
+    # n=2 checks whether the opponent could respond by winning.
+    # n=3 can set up traps to force a win on its next own move.
+    # n=4 can check for such traps.
+    return sum(7**e for e in range(n+1))
+
+class OnePlyAI(StateOfTheArt): node_limit = plies(1)
+class TwoPliesAI(StateOfTheArt): node_limit = plies(2)
+class ThreePliesAI(StateOfTheArt): node_limit = plies(3)
+class FourPliesAI(StateOfTheArt): node_limit = plies(4)
+class FivePliesAI(StateOfTheArt): node_limit = plies(5)
+class SixPliesAI(StateOfTheArt): node_limit = plies(6)
+
+
+class RandomAI(
+        TranspositionTable,
+        NoExpansion,
+        AllCombinations,
+        ZeroSumPlayer,
+        Minimax,
+        RandomChooser,
+        Search,
+): pass
 
 
 ### Game-independent core; REPL and run stub.
 
-def repl(game, state, ai_players, visuals=True):
+def repl(game, state, ai_players, visuals=True, ai_classes=None):
     while True:
         if visuals:
             game.visualize_state(state)
@@ -330,7 +389,12 @@ def repl(game, state, ai_players, visuals=True):
             else:
                 moves = game.legal_moves(state)[player]
                 if moves:
-                    search = StateOfTheArt(game, state, player)
+                    if ai_classes is None:
+                        ai_class = StateOfTheArt
+                    else:
+                        ai_class = ai_classes[player]
+                        
+                    search = ai_class(game, state, player)
                     actions[player] = search.run()
                 else:
                     actions[player] = []
@@ -350,9 +414,15 @@ def auto_tournament(game):
     DRAW=3
     results = {k: 0 for k in [1,2,3]} #game.players()}
     ai_players = game.players()
-    for _ in range(100):
+    ai_classes = {X: TwoPliesAI, O: TwoPliesAI}
+    for i in range(100):
+        print(i)
         state = game.initial_state()
-        results[repl(game, state, ai_players, visuals=False)] += 1
+        winner = repl(
+            game, state, ai_players,
+            visuals=True, ai_classes=ai_classes,
+        )
+        results[winner] += 1
     print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
 
 
@@ -360,5 +430,5 @@ if __name__ == '__main__':
     #from games.tic_tac_toe import Game
     #from games.ten_trick_take import Game
     from games.four_in_a_row import Game
-    play_interactively(Game)
-    #auto_tournament(Game)
+    #play_interactively(Game)
+    auto_tournament(Game)
