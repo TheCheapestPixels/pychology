@@ -168,7 +168,14 @@ class Search:
         self.build_tree()
         t_1 = datetime.datetime.now()
         timing.append((t_1-t_0).total_seconds())
+        self.analyze()
         return self.select_action()
+
+    def analyze(self):
+        """
+        Optional step at the end of running the search.
+        """
+        pass
 
 
 ### Modular extensions to the search core.
@@ -365,37 +372,46 @@ class BestMovePlayer:
         return random.choice(actions)
 
 
+### Analysis
+
+class TTAnalysis:
+    def analyze(self):
+        print(f"Time: {timing[-1]} seconds")
+        state_hash = self.game.hash_state(self.current_state)
+        value, options = self.opinion[state_hash]
+        print(f"Position score: {value}")
+        print(f"Action options: {', '.join(str(o) for o in options)}")
+        print(f"Known states: {len(self.known_states)}")
+        visited_states = set()
+        level = -1
+        level_states = set([state_hash])
+        while level_states:
+            level += 1
+            print(f"Level {level}: {len(level_states)}")
+            visited_states |= level_states
+            state_hashes = level_states
+            level_states = set()
+            for state_hash in state_hashes:
+                children = self.children[state_hash]
+                for child, action in children:
+                    if (child not in visited_states) and (child not in level_states):
+                        level_states.add(child)
+
+
 ### Complete searches.
 
 class StateOfTheArt(
         TranspositionTable,         # Storage
         LimitedExpansion,           # Tree expansion
-        TTBreadthSearch,            # State selection
+        TTSingleNodeBreadthSearch,  # State selection
         AllCombinations,            # Action expansion
         ZeroSumPlayer,              # State evaluation
         Minimax,                    # Action evaluation
         BestMovePlayer,             # Action selection
+        #TTAnalysis,                 # Analysis (optional)
         Search,
 ):
-    node_limit = 1000  # LimitedExpansion
-
-
-def plies(n):
-    # n=0 would not consider the possible successors at all.
-    # n=1 would only detect immediately winning moves.
-    # n=2 checks whether the opponent could respond by winning.
-    # n=3 can set up traps to force a win on its next own move.
-    # n=4 can check for such traps.
-    return sum(7**e for e in range(n+1))
-
-class OnePlyAI(StateOfTheArt): node_limit = plies(1)
-class TwoPliesAI(StateOfTheArt): node_limit = plies(2)
-class ThreePliesAI(StateOfTheArt): node_limit = plies(3)
-class FourPliesAI(StateOfTheArt): node_limit = plies(4)
-class FivePliesAI(StateOfTheArt): node_limit = plies(5)
-class SixPliesAI(StateOfTheArt): node_limit = plies(6)
-class SevenPliesAI(StateOfTheArt): node_limit = plies(7)
-class EightPliesAI(StateOfTheArt): node_limit = plies(8)
+    node_limit = 100000  # LimitedExpansion
 
 
 class RandomAI(
@@ -433,7 +449,7 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
                 moves = game.legal_moves(state)[player]
                 if moves:
                     if ai_classes is None:
-                        ai_class = ThreePliesAI
+                        ai_class = StateOfTheArt
                     else:
                         ai_class = ai_classes[player]
                         
@@ -457,7 +473,7 @@ def auto_tournament(game):
     DRAW=3
     results = {k: 0 for k in [1,2,3]} #game.players()}
     ai_players = game.players()
-    ai_classes = {X: FivePliesAI, O: FivePliesAI}
+    ai_classes = {X: StateOfTheArt, O: StateOfTheArt}
     for i in range(1):
         #print(i)
         state = game.initial_state()
@@ -477,6 +493,7 @@ def auto_tournament(game):
 if __name__ == '__main__':
     #from games.tic_tac_toe import Game
     #from games.ten_trick_take import Game
-    from games.four_in_a_row import Game
-    #play_interactively(Game)
-    auto_tournament(Game)
+    #from games.four_in_a_row import Game
+    from games.labyrinth import Game
+    play_interactively(Game)
+    #auto_tournament(Game)
