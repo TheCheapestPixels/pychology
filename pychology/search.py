@@ -67,18 +67,16 @@
 # Machine Learning: Apply it to choosing the expansion and evaluation
 # functions, train it on Monte Carlo Tree Search, and you basically have
 # AlphaGo.
-#
-#
-#
-# game = (initial_state, game_winner, legal_moves, make_move)
-# player = (evaluation)
-# ui = (visualize_state, query_actions)
-# search = (state_table, transposition_table, expansions_container)
+
 
 import random
 import itertools
 from collections import defaultdict
 import math
+
+
+global timing
+timing = []
 
 
 class Search:
@@ -88,63 +86,54 @@ class Search:
         self.current_state = state
         self.setup_storage()
         self.store_state(state)
+        self.enqueue_for_expansion(state)
 
     def setup_storage(self):
         raise NotImplementedError
 
     def store_state(self, state):
         """
-        Returns a `(nonterminal, outcome)` tuple. If the state is
-        terminal, the outcome is returned, otherwise it is False.
+        Returns True if the state has been added to storage, False if it
+        has already been present.
         """
         raise NotImplementedError
 
+    def enqueue_for_expansion(self, state):
+        raise NotImplementedError
+        
     def store_transition(self, state, action, successor):
         raise NotImplementedError
 
-    def select_state_to_expand(self):
-        # FIXME: This relies on the TranspositionTable storage.
-        state_hash = self.expansion_queue.pop(0)
-        state = self.known_states[state_hash]
-        return state
+    def select_states_to_expand(self):
+        """
+        Returns a list of states to expand.
+        """
+        raise NotImplementedError
 
     def get_expanding_actions(self, state):
         raise NotImplementedError
 
     def step(self):
-        if not self.expansion_queue:  # Queue is empty
-            return False
-        # Select node to expand
-        state = self.select_state_to_expand()
-        state_hash = self.game.hash_state(state)
-        # Choose expansions
-        actions = self.get_expanding_actions(state)
-        for action in actions:
-            successor = self.game.make_move(state, action)
-            successor_hash = self.game.hash_state(successor)
-            (nonterminal, outcome) = self.store_state(successor)
-            # Store transpositions
-            self.store_transition(state, action, successor)
-            # Evaluate expansions
-            self.value[successor_hash] = self.evaluate_state(successor)
-        # Re-evaluate this node and backpropagate value updates
-        states_to_update = [state_hash]
-        while states_to_update:
-            state_hash = states_to_update.pop(0)
-            state = self.known_states[state_hash]
-            state_value, best_actions = self.reevaluate_node(state)
-            self.opinion[state_hash] = (state_value, best_actions)
-            if state_hash not in self.value:
-                # Apparently this is the root node, and hasn't gotten a
-                # heuristic valuation at the beginning. FIXME: We should
-                # still propagate, as cycles may exist in the graph.
-                self.value[state_hash] = state_value
-            elif self.value[state_hash] != state_value:
-                self.value[state_hash] = state_value
-                for s, a in self.parents[state_hash]:
-                    states_to_update.append(s)
-        # Done. Could this state even be expanded?
-        return bool(actions)
+        """
+        Returns True if states were expanded, False otherwise.
+        """
+        states = self.select_states_to_expand()
+        if not states:
+            return False  # Nothing left to expand
+        for state in states:
+            actions = self.get_expanding_actions(state)
+            if self.game.game_winner(state):
+                continue  # Terminal states can't be expanded.
+            for action in actions:
+                successor = self.game.make_move(state, action)
+                successor_is_new_state = self.store_state(successor)
+                self.store_transition(state, action, successor)
+                if successor_is_new_state:
+                    successor_hash = self.game.hash_state(successor)
+                    self.value[successor_hash] = self.evaluate_state(successor)
+                    self.enqueue_for_expansion(successor)
+            self.backpropagate(state)
+        return True  # Keep running
 
     def build_tree(self):
         raise NotImplementedError
@@ -163,6 +152,13 @@ class Search:
         """
         raise NotImplementedError
 
+    def backpropagate(self, state):
+        """
+        Determine the actual value of the node based on states expanded
+        from it.
+        """
+        raise NotImplementedError
+
     def select_action(self):
         raise NotImplementedError
 
@@ -171,7 +167,7 @@ class Search:
         t_0 = datetime.datetime.now()
         self.build_tree()
         t_1 = datetime.datetime.now()
-        #print((t_1-t_0).total_seconds())
+        timing.append((t_1-t_0).total_seconds())
         return self.select_action()
 
 
@@ -190,32 +186,36 @@ class TranspositionTable:
         self.opinion = {}  # hash -> (value, [action])
 
     def store_state(self, state):
-        """
-        Returns a `(nonterminal, outcome)` tuple. If the state is
-        terminal, the outcome is returned, otherwise it is False."""
         state_hash = self.game.hash_state(state)
         # If the state is known already, no need for further processing.
         if state_hash in self.known_states:
-            terminal = state_hash in self.terminal_states
-            if terminal:
-                outcome = self.terminal_states[state_hash]
-            else:
-                outcome = False
-            return (terminal, outcome)
+            return False
         self.known_states[state_hash] = state
-        winner = self.game.game_winner(state)
-        if winner is None:
-            self.expansion_queue.append(state_hash)
-            return (True, False)
-        else:
-            self.terminal_states[state_hash] = winner
-            return (False, winner)
+        return True
 
     def store_transition(self, state, action, successor):
         state_hash = self.game.hash_state(state)
         successor_hash = self.game.hash_state(successor)
         self.children[state_hash].append((successor_hash, action))
         self.parents[successor_hash].append((state_hash, action))
+
+    def backpropagate(self, state):
+        state_hash = self.game.hash_state(state)
+        states_to_update = [state_hash]
+        while states_to_update:
+            state_hash = states_to_update.pop(0)
+            state = self.known_states[state_hash]
+            state_value, best_actions = self.reevaluate_node(state)
+            self.opinion[state_hash] = (state_value, best_actions)
+            if state_hash not in self.value:
+                # Apparently this is the root node, and hasn't gotten a
+                # heuristic valuation at the beginning. FIXME: We should
+                # still propagate, as cycles may exist in the graph.
+                self.value[state_hash] = state_value
+            elif self.value[state_hash] != state_value:
+                self.value[state_hash] = state_value
+                for s, a in self.parents[state_hash]:
+                    states_to_update.append(s)
 
 
 # Tree expansion
@@ -235,6 +235,45 @@ class LimitedExpansion:
     def build_tree(self):
         while self.step() and len(self.known_states) < self.node_limit:
             pass
+
+
+# State selection
+
+class TTSingleNodeBreadthSearch:
+    def enqueue_for_expansion(self, state):
+        self.expansion_queue.append(state)
+
+    def select_states_to_expand(self):
+        try:
+            state = self.expansion_queue.pop(0)
+        except IndexError:
+            return []
+        return [state]
+
+
+class TTSingleNodeDepthSearch:
+    def enqueue_for_expansion(self, state):
+        self.expansion_queue.append(state)
+
+    def select_states_to_expand(self):
+        try:
+            state = self.expansion_queue.pop(-1)
+        except IndexError:
+            return []
+        return [state]
+
+
+class TTBreadthSearch:
+    def enqueue_for_expansion(self, state):
+        self.expansion_queue.append(state)
+
+    def select_states_to_expand(self):
+        try:
+            states = self.expansion_queue
+            self.expansion_queue = []
+        except IndexError:
+            return []
+        return states
 
 
 # Action expansion
@@ -316,6 +355,7 @@ class RandomChooser:
         options = self.game.legal_moves(self.current_state)[self.player]
         return random.choice(options)
 
+
 class BestMovePlayer:
     """
     """
@@ -328,12 +368,13 @@ class BestMovePlayer:
 ### Complete searches.
 
 class StateOfTheArt(
-        TranspositionTable,  # Storage
-        LimitedExpansion,    # Tree expansion
-        AllCombinations,     # Action expansion
-        ZeroSumPlayer,       # State evaluation
-        Minimax,             # Action evaluation
-        BestMovePlayer,      # Action selection
+        TranspositionTable,         # Storage
+        LimitedExpansion,           # Tree expansion
+        TTBreadthSearch,            # State selection
+        AllCombinations,            # Action expansion
+        ZeroSumPlayer,              # State evaluation
+        Minimax,                    # Action evaluation
+        BestMovePlayer,             # Action selection
         Search,
 ):
     node_limit = 1000  # LimitedExpansion
@@ -353,6 +394,8 @@ class ThreePliesAI(StateOfTheArt): node_limit = plies(3)
 class FourPliesAI(StateOfTheArt): node_limit = plies(4)
 class FivePliesAI(StateOfTheArt): node_limit = plies(5)
 class SixPliesAI(StateOfTheArt): node_limit = plies(6)
+class SevenPliesAI(StateOfTheArt): node_limit = plies(7)
+class EightPliesAI(StateOfTheArt): node_limit = plies(8)
 
 
 class RandomAI(
@@ -390,7 +433,7 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
                 moves = game.legal_moves(state)[player]
                 if moves:
                     if ai_classes is None:
-                        ai_class = StateOfTheArt
+                        ai_class = ThreePliesAI
                     else:
                         ai_class = ai_classes[player]
                         
@@ -414,15 +457,20 @@ def auto_tournament(game):
     DRAW=3
     results = {k: 0 for k in [1,2,3]} #game.players()}
     ai_players = game.players()
-    ai_classes = {X: TwoPliesAI, O: TwoPliesAI}
-    for i in range(100):
-        print(i)
+    ai_classes = {X: FivePliesAI, O: FivePliesAI}
+    for i in range(1):
+        #print(i)
         state = game.initial_state()
         winner = repl(
             game, state, ai_players,
             visuals=True, ai_classes=ai_classes,
         )
         results[winner] += 1
+    max_time = max(timing)
+    min_time = min(timing)
+    mean_time = sum(timing) / len(timing)
+    median_time = sorted(timing)[int(len(timing)/2.0)]
+    print(f"Min: {min_time}, Max: {max_time}, Mean: {mean_time}, Median: {median_time}")
     print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
 
 
