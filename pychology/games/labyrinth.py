@@ -2,8 +2,8 @@ import math
 
 
 level = """
- .I
-  .
+..I.. ...
+  .   .
 ..... ...
 .     .
 ....... .
@@ -16,9 +16,11 @@ level = """
       .
       O"""[1:]
 
-#level = """
-#I...O"""[1:]
 
+#level = "I...O"
+
+
+### Game definition
 
 def players():
     return None
@@ -27,6 +29,7 @@ def initial_state():
     position = None
     way_out = None
     tiles = set()
+    moves_made = []
 
     for l_idx, line in enumerate(level.split('\n')):
         for t_idx, tile in enumerate(line):
@@ -37,7 +40,7 @@ def initial_state():
                     position = coord
                 elif tile=='O':
                     way_out = coord
-    return dict(tiles=tiles, position=position, way_out=way_out)
+    return dict(tiles=tiles, position=position, way_out=way_out, moves_made=moves_made)
 
 
 def game_winner(state):
@@ -62,7 +65,9 @@ def legal_moves(state):
 
 def make_move(state, moves):
     tiles = state['tiles']
-    l, t = state['position']
+    old_position = state['position']
+    l, t = old_position
+    moves_made = state['moves_made']
     move = moves[None]
     if move == "w":
         position = (l-1, t)
@@ -73,23 +78,44 @@ def make_move(state, moves):
     elif move == "d":
         position = (l, t+1)
     way_out = state['way_out']
-    return dict(tiles=tiles, position=position, way_out=way_out)
+    path = moves_made + [old_position]
+    return dict(tiles=tiles, position=position, way_out=way_out, moves_made=path)
 
 
-def hash_state(state):
-    return state['position']
-
+### Expert knowledge
 
 def evaluate_state(state):
-    if game_winner(state):
-        return {None: math.inf}
-    else:
-        return {None: 0}
+    score = -len(state['moves_made'])
+    l_p, t_p = state['position']
+    l_o, t_o = state['way_out']
+    dist = math.sqrt((l_o - l_p)**2 + (t_o - t_p)**2)
+    return {None: score-dist}
+
+
+def non_cyclic_walker(state, moves):
+    filtered_moves = []
+    for move in moves[None]:
+        successor = make_move(state, {None: move})
+        if successor['position'] in state['moves_made']:
+            print("Cycle dropped.")
+            continue
+        filtered_moves.append(move)
+    return filtered_moves
+
+
+portfolios = {'ncw': non_cyclic_walker}
+
+
+### Tooling
+
+def hash_state(state):
+    return (*state['moves_made'], state['position'])
 
 
 def visualize_state(state):
     tiles = state['tiles']
     position = state['position']
+    moves_made = state['moves_made']
     way_out = state['way_out']
     lines = max(l for l,t in tiles) + 1
     columns = max(t for l,t in tiles) + 1
@@ -109,8 +135,9 @@ def visualize_state(state):
                 line_repr.append(' ')
         board_repr.append(''.join(line_repr))
     print('\n'.join(board_repr))
+    print(f"Moves made: {len(moves_made)}")
     if game_winner(state):
-        print("You made it!")
+        print(f"You made it in {len(moves_made)} moves!")
 
 
 def query_action(player, moves):
@@ -146,6 +173,7 @@ class Game:
     players = players
     hash_state = hash_state
     evaluate_state = evaluate_state
+    portfolios = portfolios
     query_ai_players = query_ai_players
     visualize_state = visualize_state
     query_action = query_action

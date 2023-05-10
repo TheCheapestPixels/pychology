@@ -121,9 +121,9 @@ class Search:
         if not states:
             return False  # Nothing left to expand
         for state in states:
-            actions = self.get_expanding_actions(state)
             if self.game.game_winner(state):
                 continue  # Terminal states can't be expanded.
+            actions = self.get_expanding_actions(state)
             for action in actions:
                 successor = self.game.make_move(state, action)
                 successor_is_new_state = self.store_state(successor)
@@ -288,6 +288,10 @@ class TTBreadthSearch:
 class AllCombinations:
     def get_expanding_actions(self, state):
         moves = self.game.legal_moves(state)
+        combos = self.generate_move_combinations(state, moves)
+        return combos
+
+    def generate_move_combinations(self, state, moves):
         players = list(moves.keys())
         # Some players may not have any move available. The basic
         # product of moves would thus contain no moves. So here we use
@@ -302,6 +306,21 @@ class AllCombinations:
         return combos
 
 
+class Portfolio(AllCombinations):
+    def get_expanding_actions(self, state):
+        moves = self.game.legal_moves(state)
+        players = list(moves.keys())
+        portfolios = self.game.portfolios
+        portfolio = {}
+        for player in players:
+            behavior = portfolios['ncw'](state, moves)
+            if not behavior:  # A portfolio can't generate any moves...
+                return []  # ...and thus this whole state is abandoned.
+            portfolio[player] = behavior
+        #import pdb; pdb.set_trace()
+        return self.generate_move_combinations(state, portfolio)
+
+    
 # State evaluation
 
 class ZeroSumPlayer:
@@ -341,7 +360,10 @@ class Minimax:
     def reevaluate_node(self, state):
         score = defaultdict(lambda: math.inf)
         state_hash = self.game.hash_state(state)
-        for successor_hash, actions in self.children[state_hash]:
+        children = self.children[state_hash]
+        if not children:  # This state has been dropped from expansion.
+            return (-math.inf, None)
+        for successor_hash, actions in children:
             player_action = actions[self.player]
             successor_value = self.value[successor_hash]
             score[player_action] = min(score[player_action], successor_value)
@@ -404,11 +426,12 @@ class StateOfTheArt(
         TranspositionTable,         # Storage
         LimitedExpansion,           # Tree expansion
         TTSingleNodeBreadthSearch,  # State selection
-        AllCombinations,            # Action expansion
+        Portfolio,                  # Action expansion
+        #AllCombinations,
         ZeroSumPlayer,              # State evaluation
         Minimax,                    # Action evaluation
         BestMovePlayer,             # Action selection
-        #TTAnalysis,                 # Analysis (optional)
+        TTAnalysis,                 # Analysis (optional)
         Search,
 ):
     node_limit = 100000  # LimitedExpansion
