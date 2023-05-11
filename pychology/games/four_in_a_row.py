@@ -131,8 +131,9 @@ def evaluate_state(state):
 def visualize_state(state):
     print()
     board = state['board']
-    tiles = []
+    lines = []
     for r_id in range(ROWS-1, -1, -1):
+        tiles = []
         for c_id in range(COLUMNS):
             if (len(board[c_id]) - 1) < r_id:
                 tiles.append(".")
@@ -141,11 +142,10 @@ def visualize_state(state):
                     tiles.append("X")
                 else:
                     tiles.append("O")
-        tiles.append("\n")
-    for r_id in range(COLUMNS):
-        tiles.append(str(r_id))
-    tiles.append("\n")
-    print(''.join(tiles))
+        lines.append(' '.join(tiles))
+    lines.append(' '.join(str(r_id) for r_id in range(COLUMNS)))
+    print('\n'.join(lines))
+    print()
     winner = game_winner(state)
     if winner is not None:
         if winner == X:
