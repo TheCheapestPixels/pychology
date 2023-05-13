@@ -330,7 +330,7 @@ class ZeroSumPlayer:
     but should serve the same effect.
     """
     def evaluate_state(self, state):
-        slate = self.game.evaluate_state(state)
+        slate = self.evaluate_state_by_player(state)
         oppo_slate = [v for p, v in slate.items() if p != self.player]
         value = slate[self.player] - sum(oppo_slate)
         return value
@@ -356,7 +356,14 @@ class RacerPlayer:
 
 # Action evalution
 
-class Minimax:
+class GameBasedEvaluation:
+    evaluation_function = 'default'
+
+    def evaluate_state_by_player(self, state):
+        return self.game.evaluation_funcs[self.evaluation_function](state)
+
+
+class Minimax(GameBasedEvaluation):
     def reevaluate_node(self, state):
         score = defaultdict(lambda: math.inf)
         state_hash = self.game.hash_state(state)
@@ -404,6 +411,7 @@ class TTAnalysis:
         print(f"Position score: {value}")
         print(f"Action options: {', '.join(str(o) for o in options)}")
         print(f"Known states: {len(self.known_states)}")
+        # States per depth level
         visited_states = set()
         level = -1
         level_states = set([state_hash])
@@ -426,15 +434,15 @@ class StateOfTheArt(
         TranspositionTable,         # Storage
         LimitedExpansion,           # Tree expansion
         TTSingleNodeBreadthSearch,  # State selection
-        Portfolio,                  # Action expansion
-        #AllCombinations,
+        #Portfolio,                  # Action expansion
+        AllCombinations,
         ZeroSumPlayer,              # State evaluation
         Minimax,                    # Action evaluation
         BestMovePlayer,             # Action selection
         TTAnalysis,                 # Analysis (optional)
         Search,
 ):
-    node_limit = 100000  # LimitedExpansion
+    node_limit = 50000  # LimitedExpansion
 
 
 class RandomAI(
@@ -485,9 +493,18 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
 
 
 def play_interactively(game):
+    X=1
+    O=2
     ai_players = game.query_ai_players()
+    ai_classes = {X: StateOfTheArt, O: LineRewardingAI}
     state = game.initial_state()
-    repl(game, state, ai_players)
+    repl(game, state, ai_players, ai_classes=ai_classes)
+
+
+### Tournament glue code
+
+class LineRewardingAI(StateOfTheArt):
+    evaluation_function = 'line_rewarder'
 
 
 def auto_tournament(game):
@@ -496,13 +513,13 @@ def auto_tournament(game):
     DRAW=3
     results = {k: 0 for k in [1,2,3]} #game.players()}
     ai_players = game.players()
-    ai_classes = {X: StateOfTheArt, O: StateOfTheArt}
-    for i in range(1):
-        #print(i)
+    ai_classes = {X: LineRewardingAI, O: LineRewardingAI}
+    for i in range(100):
+        print(i)
         state = game.initial_state()
         winner = repl(
             game, state, ai_players,
-            visuals=True, ai_classes=ai_classes,
+            visuals=False, ai_classes=ai_classes,
         )
         results[winner] += 1
     max_time = max(timing)
@@ -516,7 +533,7 @@ def auto_tournament(game):
 if __name__ == '__main__':
     #from games.tic_tac_toe import Game
     #from games.ten_trick_take import Game
-    #from games.four_in_a_row import Game
-    from games.labyrinth import Game
+    from games.four_in_a_row import Game
+    #from games.labyrinth import Game
     play_interactively(Game)
     #auto_tournament(Game)

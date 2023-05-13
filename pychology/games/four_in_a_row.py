@@ -8,117 +8,103 @@ DRAW = 3
 ROWS = 6
 COLUMNS = 7
 
+exponents = range(ROWS * COLUMNS)
+
+win_lines = []
+# Vertical lines
+for c in range(COLUMNS):
+    for r in range(ROWS - 3):
+        tile = r * COLUMNS + c
+        t_1 = tile
+        t_2 = tile + COLUMNS
+        t_3 = tile + COLUMNS * 2
+        t_4 = tile + COLUMNS * 3
+        win_lines.append((t_1, t_2, t_3, t_4))
+# Horizontal lines
+for r in range(ROWS):
+    for c in range(COLUMNS - 3):
+        tile = r * COLUMNS + c
+        t_1 = tile
+        t_2 = tile + 1
+        t_3 = tile + 2
+        t_4 = tile + 3
+        win_lines.append((t_1, t_2, t_3, t_4))
+# Upward Diagonals
+for r in range(ROWS - 3):
+    for c in range(COLUMNS - 3):
+        tile = r * COLUMNS + c
+        t_1 = tile
+        t_2 = tile + 1 + COLUMNS
+        t_3 = tile + 2 + COLUMNS * 2
+        t_4 = tile + 3 + COLUMNS * 3
+        win_lines.append((t_1, t_2, t_3, t_4))
+# Downward Diagonals
+for r in range(ROWS - 3):
+    for c in range(COLUMNS - 3):
+        tile = r * COLUMNS + c
+        t_1 = tile + COLUMNS * 3
+        t_2 = tile + 1 + COLUMNS * 2
+        t_3 = tile + 2 + COLUMNS
+        t_4 = tile + 3
+        win_lines.append((t_1, t_2, t_3, t_4))
+
 
 def players():
     return [X, O]
 
 
 def initial_state():
-    board = {c: [] for c in range(COLUMNS)}
-    player = X
-    return dict(board=board, player=player)
+    board = [0 for _ in range(ROWS * COLUMNS)]
+    return board
 
 
 def game_winner(state):
-    board = state['board']
-    def get_tile(column_id, row_id):
-        if row_id < len(board[column_id]):
-            return board[column_id][row_id]
-        else:
-            raise KeyError
-    # Columns
-    for c_id in range(COLUMNS):
-        for r_id in range(ROWS - 3):
-            try:
-                t_1 = get_tile(c_id, r_id)
-                t_2 = get_tile(c_id, r_id + 1)
-                t_3 = get_tile(c_id, r_id + 2)
-                t_4 = get_tile(c_id, r_id + 3)
-                if t_1 == t_2 == t_3 == t_4:
-                    return t_1
-            except KeyError:
-                pass
-    # Rows
-    for r_id in range(ROWS):
-        for c_id in range(COLUMNS - 3):
-            try:
-                t_1 = get_tile(c_id, r_id)
-                t_2 = get_tile(c_id + 1, r_id)
-                t_3 = get_tile(c_id + 2, r_id)
-                t_4 = get_tile(c_id + 3, r_id)
-                if t_1 == t_2 == t_3 == t_4:
-                    return t_1
-            except KeyError:
-                pass
-    # Upward Diagonals
-    for r_id in range(ROWS - 3):
-        for c_id in range(COLUMNS - 3):
-            try:
-                t_1 = get_tile(c_id, r_id)
-                t_2 = get_tile(c_id + 1, r_id + 1)
-                t_3 = get_tile(c_id + 2, r_id + 2)
-                t_4 = get_tile(c_id + 3, r_id + 3)
-                if t_1 == t_2 == t_3 == t_4:
-                    return t_1
-            except KeyError:
-                pass
-    # Downward Diagonals
-    for r_id in range(ROWS - 3):
-        for c_id in range(COLUMNS - 3):
-            try:
-                t_1 = get_tile(c_id, r_id + 3)
-                t_2 = get_tile(c_id + 1, r_id + 2)
-                t_3 = get_tile(c_id + 2, r_id + 1)
-                t_4 = get_tile(c_id + 3, r_id)
-                if t_1 == t_2 == t_3 == t_4:
-                    return t_1
-            except KeyError:
-                pass
+    # Is there a regular winner?
+    for t_1, t_2, t_3, t_4 in win_lines:
+        if state[t_1] != 0:
+            if state[t_1] == state[t_2] == state[t_3] == state[t_4]:
+                return state[t_1]
     # If the board is filled and there is no winner, it's a draw.
-    if all([len(c)==ROWS for c in state['board'].values()]):
+    legal = [c for c in range(COLUMNS)
+             if state[c + (ROWS - 1) * COLUMNS] == 0]
+    if len(legal) == 0:
         return DRAW
     # So there's no winner, and the board isn't full; The game goes on.
     return None
 
 
 def legal_moves(state):
+    if sum(state) % 3 == 0:
+        player = X
+    else:
+        player = O
     moves = {player: [] for player in players()}
-    actual_moves = [c_id
-                    for c_id, c in state['board'].items()
-                    if len(c)<ROWS]
-    moves[state['player']] = actual_moves
+    legal = [c for c in range(COLUMNS)
+             if state[c + (ROWS - 1) * COLUMNS] == 0]
+    moves[player] = legal
     return moves
 
 
 def make_move(state, moves):
-    player = state['player']
-    move = moves[player]
-    new_board = {c_id: [t for t in c]
-                 for c_id, c in state['board'].items()}
-    new_board[move].append(player)
-    if player == X:
-        new_player = O
+    if sum(state) % 3 == 0:
+        player = X
     else:
-        new_player = X
-    return dict(board=new_board, player=new_player)
+        player = O
+    column = moves[player]
+    new_board = [t for t in state]
+    for r in range(ROWS):
+        tile = r * COLUMNS + column
+        if new_board[tile] == 0:
+            new_board[tile] = player
+            break
+    return new_board
 
 
 def hash_state(state):
-    board = state['board']
-    tiles = []
-    for c_id in range(COLUMNS):
-        for t_id in range(ROWS):
-            if (len(board[c_id]) - 1) < t_id:
-                tiles.append(".")
-            else:
-                if board[c_id][t_id] == X:
-                    tiles.append("X")
-                else:
-                    tiles.append("O")
-    return ''.join(tiles)                    
+    return sum(b * 3**e for b, e in zip(state, exponents))
 
 
-def evaluate_state(state):
+def evaluate_state_naively(state):
     winner = game_winner(state)
     if winner == X:
         return {X: math.inf, O: -math.inf}
@@ -128,22 +114,56 @@ def evaluate_state(state):
         return {X: 0, O: 0}
 
 
+def evaluate_state_heuristically(state):
+    def has_won(player):
+        score = {p: -math.inf for p in players()}
+        score[player] = math.inf
+        return score
+    def draw():
+        return {p: 0 for p in players()}
+
+    line_chances = draw()
+    # Is there a regular winner?
+    for tile_ids in win_lines:
+        tiles = t_1, t_2, t_3, t_4 = [state[t] for t in tile_ids]
+        if t_1 != 0:
+            if t_1 == t_2 == t_3 == t_4:
+                return has_won(t_1)
+            for p in players():
+                player_tiles_in_line = [t==p for t in tiles]
+                if len(player_tiles_in_line) > 0:
+                    if all(t==0 or t==p for t in tiles):
+                        num_own_tiles = len(player_tiles_in_line)
+                        line_chances[p] += 4 ** (num_own_tiles - 1)
+    # If the board is filled and there is no winner, it's a draw.
+    legal = [c for c in range(COLUMNS)
+             if state[c + (ROWS - 1) * COLUMNS] == 0]
+    if len(legal) == 0:
+        return draw()
+    # So there's no winner, and the board isn't full; The game goes on.
+    return line_chances
+
+
 def visualize_state(state):
+    if sum(state) % 3 == 0:
+        player = X
+    else:
+        player = O
+
     print()
-    board = state['board']
     lines = []
-    for r_id in range(ROWS-1, -1, -1):
+    for r in range(ROWS-1, -1, -1):
         tiles = []
-        for c_id in range(COLUMNS):
-            if (len(board[c_id]) - 1) < r_id:
+        for c in range(COLUMNS):
+            t = state[r * COLUMNS + c]
+            if t == 0:
                 tiles.append(".")
+            elif t == X:
+                tiles.append("X")
             else:
-                if board[c_id][r_id] == X:
-                    tiles.append("X")
-                else:
-                    tiles.append("O")
+                tiles.append("O")
         lines.append(' '.join(tiles))
-    lines.append(' '.join(str(r_id) for r_id in range(COLUMNS)))
+    lines.append(' '.join(str(r) for r in range(COLUMNS)))
     print('\n'.join(lines))
     print()
     winner = game_winner(state)
@@ -155,7 +175,7 @@ def visualize_state(state):
         else:  # winner == DRAW
             print("Game ended in a draw.")
     else:
-        if state['player'] == X:
+        if player == X:
             print(f"Move: X")
         else:
             print(f"Move: O")
@@ -201,7 +221,10 @@ class Game:
     make_move = make_move
     players = players
     hash_state = hash_state
-    evaluate_state = evaluate_state
     query_ai_players = query_ai_players
+    evaluation_funcs = {
+        'default': evaluate_state_naively,
+        'line_rewarder': evaluate_state_heuristically,
+    }
     visualize_state = visualize_state
     query_action = query_action

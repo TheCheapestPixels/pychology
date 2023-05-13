@@ -134,7 +134,7 @@ class Game:
     make_move = make_move
     players = players
     hash_state = hash_state
-    evaluate_state = evaluate_state
+    evaluation_funcs = {'default': evaluate_state}
     query_ai_players = query_ai_players
     visualize_state = visualize_state
     query_action = query_action
