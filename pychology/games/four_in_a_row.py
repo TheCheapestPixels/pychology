@@ -1,4 +1,5 @@
 import math
+import random
 
 
 X = 1
@@ -114,6 +115,27 @@ def evaluate_state_naively(state):
         return {X: 0, O: 0}
 
 
+def evaluate_state_mcts(state):
+    winner = game_winner(state)
+    if winner == X:
+        return {X: math.inf, O: -math.inf}
+    elif winner == O:
+        return {X: -math.inf, O: math.inf}
+    else:
+        while not (winner := game_winner(state)):
+            moves = legal_moves(state)
+            choices = {player: None for player in moves}
+            for player, options in moves.items():
+                if options:
+                    choices[player] = random.choice(options)
+            state = make_move(state, choices)
+        if winner == DRAW:
+            return {X: 0, O: 0}
+        score = {X: -1, O: -1}
+        score[winner] = 1
+        return score
+
+
 def evaluate_state_heuristically(state):
     def has_won(player):
         score = {p: -math.inf for p in players()}
@@ -225,6 +247,7 @@ class Game:
     evaluation_funcs = {
         'default': evaluate_state_naively,
         'line_rewarder': evaluate_state_heuristically,
+        'mcts': evaluate_state_mcts,
     }
     visualize_state = visualize_state
     query_action = query_action

@@ -442,7 +442,7 @@ class StateOfTheArt(
         TTAnalysis,                 # Analysis (optional)
         Search,
 ):
-    node_limit = 50000  # LimitedExpansion
+    node_limit = 10000  # LimitedExpansion
 
 
 class RandomAI(
@@ -507,19 +507,23 @@ class LineRewardingAI(StateOfTheArt):
     evaluation_function = 'line_rewarder'
 
 
+class MonteCarloAI(StateOfTheArt):
+    evaluation_function = 'mcts'
+
+
 def auto_tournament(game):
     X=1
     O=2
     DRAW=3
     results = {k: 0 for k in [1,2,3]} #game.players()}
     ai_players = game.players()
-    ai_classes = {X: LineRewardingAI, O: LineRewardingAI}
+    ai_classes = {X: StateOfTheArt, O: MonteCarloAI}
     for i in range(100):
         print(i)
         state = game.initial_state()
         winner = repl(
             game, state, ai_players,
-            visuals=False, ai_classes=ai_classes,
+            visuals=True, ai_classes=ai_classes,
         )
         results[winner] += 1
     max_time = max(timing)
@@ -535,5 +539,5 @@ if __name__ == '__main__':
     #from games.ten_trick_take import Game
     from games.four_in_a_row import Game
     #from games.labyrinth import Game
-    play_interactively(Game)
-    #auto_tournament(Game)
+    #play_interactively(Game)
+    auto_tournament(Game)
