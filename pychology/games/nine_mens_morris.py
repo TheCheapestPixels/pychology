@@ -126,9 +126,9 @@ def legal_moves(state):
                 enemies = [idx for idx, t in enumerate(board)
                            if board[idx] not in [None, player]]
                 for enemy in enemies:
-                    actions[player].append((target_idx, enemy))
+                    actions[player].append((None, target_idx, enemy))
             else:  # No mill closed
-                actions[player].append((target_idx, ))
+                actions[player].append((None, target_idx, None))
     else:
         # FIXME: If player has only three (four?) men -> flying
         for tile_idx, tile in enumerate(board):
@@ -142,7 +142,7 @@ def legal_moves(state):
                             for enemy in enemies:
                                 actions[player].append((tile_idx, target_idx, enemy))
                         else:  # No mill closed
-                            actions[player].append((tile_idx, target_idx))
+                            actions[player].append((tile_idx, target_idx, None))
     return actions
 
 
@@ -150,16 +150,13 @@ def make_move(state, all_actions):
     new_board = [t for t in state['board']]
     player = state['player']
     action = all_actions[player]
+    tile_idx, target_idx, enemy_idx = action
 
-    if state['phase'] == Phase.SETTING:
-        new_board[action[0]] = player
-        if len(action) == 2:  # Mill formed, capture opponent
-            new_board[action[1]] = None
-    else:  # Phase.MOVING
-        new_board[action[0]] = None
-        new_board[action[1]] = player
-        if len(action) == 3:  # Mill formed, capture opponent
-            new_board[action[2]] = None
+    if tile_idx is not None:  # Moving a man, clearing up old tile
+        new_board[tile_idx] = None
+    new_board[target_idx] = player  # Occupying new tile
+    if enemy_idx is not None:  # Capturing
+        new_board[enemy_idx] = None
 
     new_men_set = state['men_set']
     new_phase = state['phase']
@@ -259,19 +256,33 @@ def visualize_state(state):
             print(f"Move: O")
 
 
+def move_to_string(move):
+    tile, target, enemy = move
+    if tile is None:
+        if enemy is None:
+            return f"{target+1}"
+        else:
+            return f"{target+1}x{enemy+1}"
+    else:
+        if enemy is None:
+            return f"{tile+1}-{target+1}"
+        else:
+            return f"{tile+1}-{target+1}x{enemy+1}"
+
+
 def query_action(player, moves):
+    str_to_move = {move_to_string(move): move
+                   for move in moves}
+    print(f"Legal moves: {', '.join(str_to_move.keys())}")
     while True:
         choice = input("Your choice: ")
-        try:
-            choice = int(choice)
-        except ValueError:
-            pass
-        if choice not in moves:
+        if choice not in str_to_move:
             print("Invalid move.")
         else:
+            action = str_to_move[choice]
             break
     print()
-    return choice
+    return action
 
 
 def query_ai_players():
