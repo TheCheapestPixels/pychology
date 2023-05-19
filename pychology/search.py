@@ -317,7 +317,6 @@ class Portfolio(AllCombinations):
             if not behavior:  # A portfolio can't generate any moves...
                 return []  # ...and thus this whole state is abandoned.
             portfolio[player] = behavior
-        #import pdb; pdb.set_trace()
         return self.generate_move_combinations(state, portfolio)
 
     
@@ -442,7 +441,7 @@ class StateOfTheArt(
         TTAnalysis,                 # Analysis (optional)
         Search,
 ):
-    node_limit = 10000  # LimitedExpansion
+    node_limit = 1000  # LimitedExpansion
 
 
 class RandomAI(
@@ -454,90 +453,3 @@ class RandomAI(
         RandomChooser,
         Search,
 ): pass
-
-
-### Game-independent core; REPL and run stub.
-
-def repl(game, state, ai_players, visuals=True, ai_classes=None):
-    while True:
-        if visuals:
-            game.visualize_state(state)
-        winner = game.game_winner(state)
-        if winner is not None:
-            break
-
-        moves = game.legal_moves(state)
-        actions = {}
-        for player, player_moves in moves.items():
-            if player not in ai_players:
-                if player_moves:
-                    actions[player] = game.query_action(
-                        player,
-                        player_moves,
-                    )
-                else: actions[player] = []
-            else:
-                moves = game.legal_moves(state)[player]
-                if moves:
-                    if ai_classes is None:
-                        ai_class = StateOfTheArt
-                    else:
-                        ai_class = ai_classes[player]
-                        
-                    search = ai_class(game, state, player)
-                    actions[player] = search.run()
-                else:
-                    actions[player] = []
-        state = game.make_move(state, actions)
-    return winner
-
-
-def play_interactively(game):
-    X=1
-    O=2
-    ai_players = game.query_ai_players()
-    ai_classes = {X: StateOfTheArt, O: LineRewardingAI}
-    state = game.initial_state()
-    repl(game, state, ai_players, ai_classes=ai_classes)
-
-
-### Tournament glue code
-
-class LineRewardingAI(StateOfTheArt):
-    evaluation_function = 'line_rewarder'
-
-
-class MonteCarloAI(StateOfTheArt):
-    evaluation_function = 'mcts'
-
-
-def auto_tournament(game):
-    X=1
-    O=2
-    DRAW=3
-    results = {k: 0 for k in [1,2,3]} #game.players()}
-    ai_players = game.players()
-    ai_classes = {X: StateOfTheArt, O: MonteCarloAI}
-    for i in range(100):
-        print(i)
-        state = game.initial_state()
-        winner = repl(
-            game, state, ai_players,
-            visuals=True, ai_classes=ai_classes,
-        )
-        results[winner] += 1
-    max_time = max(timing)
-    min_time = min(timing)
-    mean_time = sum(timing) / len(timing)
-    median_time = sorted(timing)[int(len(timing)/2.0)]
-    print(f"Min: {min_time}, Max: {max_time}, Mean: {mean_time}, Median: {median_time}")
-    print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
-
-
-if __name__ == '__main__':
-    #from games.tic_tac_toe import Game
-    #from games.ten_trick_take import Game
-    from games.four_in_a_row import Game
-    #from games.labyrinth import Game
-    #play_interactively(Game)
-    auto_tournament(Game)
