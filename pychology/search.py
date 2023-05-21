@@ -238,10 +238,16 @@ class FullExpansion:
             pass
 
 
-class LimitedExpansion:
+class NodeLimitedExpansion:
     def build_tree(self):
         while self.step() and len(self.known_states) < self.node_limit:
             pass
+
+
+class StepLimitedExpansion:
+    def build_tree(self):
+        for _ in range(self.expansion_steps):
+            self.step()
 
 
 # State selection
@@ -431,7 +437,7 @@ class TTAnalysis:
 
 class StateOfTheArt(
         TranspositionTable,         # Storage
-        LimitedExpansion,           # Tree expansion
+        NodeLimitedExpansion,       # Tree expansion
         TTSingleNodeBreadthSearch,  # State selection
         #Portfolio,                  # Action expansion
         AllCombinations,
@@ -441,7 +447,21 @@ class StateOfTheArt(
         TTAnalysis,                 # Analysis (optional)
         Search,
 ):
-    node_limit = 1000  # LimitedExpansion
+    node_limit = 10000  # LimitedExpansion
+
+
+class FixedPliesAI(
+        TranspositionTable,         # Storage
+        StepLimitedExpansion,       # Tree expansion
+        TTBreadthSearch,            # State selection
+        AllCombinations,            # Action expansion
+        ZeroSumPlayer,              # State evaluation
+        Minimax,                    # Action evaluation
+        BestMovePlayer,             # Action selection
+        TTAnalysis,                 # Analysis (optional)
+        Search,
+):
+    expansion_steps = 2
 
 
 class RandomAI(

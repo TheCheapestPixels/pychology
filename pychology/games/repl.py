@@ -1,6 +1,9 @@
 import sys
+from pychology.search import FixedPliesAI
 from pychology.search import StateOfTheArt
 
+
+# Experimental code
 
 class LineRewardingAI(StateOfTheArt):
     evaluation_function = 'line_rewarder'
@@ -9,6 +12,12 @@ class LineRewardingAI(StateOfTheArt):
 
 class MonteCarloAI(StateOfTheArt):
     evaluation_function = 'mcts'
+
+
+# The actual code
+
+class DefaultAI(FixedPliesAI):
+    expansion_steps = 8
 
 
 def repl(game, state, ai_players, visuals=True, ai_classes=None):
@@ -33,7 +42,7 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
                 moves = game.legal_moves(state)[player]
                 if moves:
                     if ai_classes is None:
-                        ai_class = StateOfTheArt
+                        ai_class = DefaultAI
                     else:
                         ai_class = ai_classes[player]
                         
@@ -47,7 +56,7 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
 
 def play_interactively(game):
     ai_players = game.query_ai_players()
-    ai_classes = {p: StateOfTheArt for p in game.players()}
+    ai_classes = {p: DefaultAI for p in game.players()}
     state = game.initial_state()
     repl(game, state, ai_players, ai_classes=ai_classes)
 
