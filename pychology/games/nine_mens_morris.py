@@ -66,6 +66,7 @@ tile_adjacency = {t-1: [g-1 for g in n] for t,n in tile_adjacency.items()}
 
 
 MEN = 9
+FLYING = True
 
 
 class Player(Enum):
@@ -125,24 +126,42 @@ def legal_moves(state):
             if closes_mill(state, None, target_idx):
                 enemies = [idx for idx, t in enumerate(board)
                            if board[idx] not in [None, player]]
+                enemies_not_in_mills = []
+                for enemy in enemies:
+                    for line in lines:
+                        if enemy in line:
+                            if all(board[tile] not in [player, None] for tile in line):
+                                # enemy is in a mill
+                                break
+                    else:  # Enemy is not in a mill
+                        enemies_not_in_mills.append(enemy)
+                if enemies_not_in_mills:  # Not all enemy stones are in mills
+                    enemies = enemies_not_in_mills  # ...otherwise, all enemy stones are capturable
                 for enemy in enemies:
                     actions[player].append((None, target_idx, enemy))
             else:  # No mill closed
                 actions[player].append((None, target_idx, None))
     else:
-        # FIXME: If player has only three (four?) men -> flying
-        for tile_idx, tile in enumerate(board):
-            if tile == player:  # Own piece
-                for target_idx in tile_adjacency[tile_idx]:
-                    if board[target_idx] is None:  # Neighbor is free
-                        # Move can be made; Does it close a mill?
-                        if closes_mill(state, tile_idx, target_idx):
-                            enemies = [idx for idx, t in enumerate(board)
-                                       if board[idx] not in [None, player]]
-                            for enemy in enemies:
-                                actions[player].append((tile_idx, target_idx, enemy))
-                        else:  # No mill closed
-                            actions[player].append((tile_idx, target_idx, None))
+        if FLYING and len(tiles := [idx for idx, tile in enumerate(board) if tile==player]) == 3:  # Flying enabled
+            moves = [(tile_idx, target_idx)
+                     for tile_idx in tiles
+                     for target_idx, target in enumerate(board)
+                     if target is None]
+        else:
+            moves = [(tile_idx, target_idx)
+                     for tile_idx, tile in enumerate(board)
+                     if tile == player
+                     for target_idx in tile_adjacency[tile_idx]
+                     if board[target_idx] is None]
+        for tile_idx, target_idx in moves:
+            # Move can be made; Does it close a mill?
+            if closes_mill(state, tile_idx, target_idx):
+                enemies = [idx for idx, t in enumerate(board)
+                           if board[idx] not in [None, player]]
+                for enemy in enemies:
+                    actions[player].append((tile_idx, target_idx, enemy))
+            else:  # No mill closed
+                actions[player].append((tile_idx, target_idx, None))
     return actions
 
 
@@ -221,7 +240,7 @@ def visualize_state(state):
     }
     s = [str_reprs[t] for t in state['board']]
     board_str = f"""
- {s[0]}-----------{s[1]}-----------{s[2]}        1---------- 2---------- 3
+ {s[0]}-----------{s[1]}-----------{s[2]}        1-----------2-----------3
  |           |           |        |           |           |
  |   {s[3]}-------{s[4]}-------{s[5]}   |        |   4-------5-------6   |
  |   |       |       |   |        |   |       |       |   |
