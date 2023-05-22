@@ -16,8 +16,10 @@ class MonteCarloAI(StateOfTheArt):
 
 # The actual code
 
-class DefaultAI(FixedPliesAI):
-    expansion_steps = 8
+#class DefaultAI(FixedPliesAI):
+#    expansion_steps = 4
+class DefaultAI(StateOfTheArt):
+    node_limit = 10000
 
 
 def repl(game, state, ai_players, visuals=True, ai_classes=None):
@@ -54,17 +56,19 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
     return winner
 
 
-def play_interactively(game):
+def play_interactively(game, ai_classes=None):
     ai_players = game.query_ai_players()
-    ai_classes = {p: DefaultAI for p in game.players()}
+    if ai_classes is None:
+        ai_classes = {p: DefaultAI for p in game.players()}
     state = game.initial_state()
     repl(game, state, ai_players, ai_classes=ai_classes)
 
 
-def auto_tournament(game):
+def auto_tournament(game, ai_classes=None):
     results = {p: 0 for p in game.players()}
     ai_players = game.players()
-    ai_classes = {p: StateOfTheArt for p in game.players()}
+    if ai_classes is None:
+        ai_classes = {p: DefaultAI for p in game.players()}
     for i in range(100):
         print(i)
         state = game.initial_state()
@@ -98,13 +102,28 @@ if __name__ == '__main__':
         action='store_true',
         help="Collects statistics of AIs playing against each other.",
     )
+    parser.add_argument(
+        'ai',
+        nargs='*',
+        help="Specifications for AI players.",
+    )
     args = parser.parse_args()
 
-    #try:
-    game = importlib.import_module(args.game)
-    #except Exception as e:
-    #    print(f"Can't import game module {args.game}")
-    #    sys.exit(1)
+    try:
+        game = importlib.import_module(args.game)
+    except Exception as e:
+        print(f"Can't import game module {args.game}")
+        raise e
+
+    # Decode AI specs
+    # No specs -> Use default AIs
+    # Exactly one spec: One for all
+    # Multiple specs -> Multiple options
+    #   One spec/ellipsis per game participant
+    #   Multiple AIs to be tested against each other
+    print(args.ai)
+
+    # Run
     if args.tournament:
         auto_tournament(game.Game)
     else:
