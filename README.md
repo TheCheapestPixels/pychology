@@ -73,7 +73,7 @@ They can all be modeled in terms of current states, actions that players
 are able to take when the game is in a certain state, and successor
 states that the game will be in if a certain set of actions is taken.
 This principle also applies to complex video games, especially when it
-comes to pathfinding and action planning.
+comes to problems like pathfinding and action planning.
 
 Game states can be considered as nodes in a graph, and the corresponding
 valid actions as directed edges from node to node. To play a game like
@@ -86,6 +86,78 @@ possible future game states out from the current state, and finding the
 paths through it that lead to the optimal possible future state. This
 search can be improved on both by clever optimizations on the search
 itself, and through expert knowledge expressed as heuristic functions.
+
+To make a problem tractable to search, it has to be formulated as
+functions:
+
+* `players()` returns a list of players in the game,
+* `game_winner(state)` determines whether a player has won in the given
+  state,
+* `legal_moves(state)` gives a list of actions that each player can
+  take, and
+* `make_moves(state, moves)` returns the state that the game is in when
+  the players make the indicated moves.
+
+In addition to these core functions, different aspects that may be used
+in the search may require additional functions:
+
+* `hash_state(state)` creates a value that identifies the state. It
+  should do so uniquely, meaning that no two states have the same hash;
+  However, hash functions for which that is not guaranteed have been
+  used successfully, e.g. Zobrist hashing for chess.
+
+  This function is used by the `TranspositionTable` implementation for
+  state storage, allowing states to be stored as a directed graph
+  instead of a tree, which allows for states to be reused, should
+  different sequences of moves lead to them.
+
+  FIXME: There are still some occurrences of `hash_state` in the code
+  that are not yet contained in the `TranspositionTable`.
+* `evaluate_state(state)` generates a numerical value that expresses how
+  good the given state is for the player; If one of two states is better
+  than the other, its evaluation should be higher than the other's.
+
+  This entry is special as the game should provide a dictionary of
+  evaluation functions. This allows for configuring the playing strength
+  of the search.
+
+  FIXME: This function should default to using the result of
+  `game_winner` to generate basic valuations (`math.inf` / `-math.inf` /
+  0 for winning, losing, and a draw respectively), so that providing an
+  evaluation function truly is optional. Similarly the MCTS evaluation
+  function should be selectable without being specified in the game.
+  Both these features still need to be implemented.
+
+Finally, there is a set of functions used by the `repl.py` command line
+tool to provide a textual interface to games.
+
+* `initial_state()` defines the state of the board at the beginning of
+  the game.
+* `query_ai_players()` returns a list of players that should be played
+  by the search.
+* `visualize_state(state)` unsurprisingly outputs the state for the
+  user.
+* `query_action()` asks the user(s) which move they want to make.
+
+All of these functions then are put together in a class which gets
+passed to the search on its creation time, together with the current
+state and the player for which the search should find the best action:
+
+```python
+from pychology.search import Search
+
+
+search = Search(game, state, player)
+action = search.run()
+```
+
+NOTE: This example is wrong, as `Search` is merely the base class from
+which actual search classes are created by inheriting both it and the
+classes which define the different capabilities of the search.
+
+FIXME: Here should follow a section explaining the expansion/evaluation
+cycle, and the different categories of extensions as well as their
+different implementations.
 
 
 TODO
@@ -105,6 +177,8 @@ TODO
     * Debug
       * Recording activation, return values, and resets frame by frame
     * Tree visualization and editing in Panda3D
+  * Documentation
+    * Separate detailed page
 * Search
   * Algorithms
     * Alpha-Beta Pruning
@@ -112,14 +186,39 @@ TODO
     * Bidirectional Search
     * Pondering
       * State graph garbage collection
+    * Demonstrate machine learning wherever applicable
+    * Counterfactual Regret Minimization
+      * https://en.wikipedia.org/wiki/Regret_(decision_theory)
+      * http://modelai.gettysburg.edu/2013/cfr/cfr.pdf
+      * https://poker.cs.ualberta.ca/publications/NIPS07-cfr.pdf
+      * https://towardsdatascience.com/counterfactual-regret-minimization-ff4204bf4205?gi=a09c56e9300c
+    * Action selection: Shortest beat path
   * Hacks
     * Early termination of expansion if the root node has only one
       action available
+    * A state, once expanded, is not used anymore, and can be removed
+      from memory; Only its metadata is what we are after.
   * Tooling
-    * Break REPL / automatic tournaments out of search
-  * Games
-    * Nine Men's Morris (and variations)
+    * REPL
+      * General cleanup and abstraction
+      * Command line arguments
+        * `--ai limit_type=plies,limit=3,eval_mcts,analysis`
+      * CSV / JSON output
+  * Cleanup
+    * Provide a default evaluation class that creates its values from
+      `game_winner`.
+    * Abstract MCTS out of Four in a Row into a state evaluation class
+    * Move expansion queue into its own type of class
+      * Add priority queue
+  * Documentation
+    * README: More explanations
+    * Separate, detailed page, akin to a course
+    * Docstrings
+  * MyPy: Refactor code and test speed improvements
 * Planning
   * Goal-Oriented Action Planning (GOAP): Everything
   * Hierarchical Task Planning (HTN): Everything
 * [Whatever this is](https://www.youtube.com/watch?v=Z-xU96pAuqs)
+* Tolman-Eichenbaum machine
+  * https://web.archive.org/web/20200325015457id_/https://www.biorxiv.org/content/biorxiv/early/2019/09/16/770495.full.pdf
+  * https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7707106/
