@@ -75,10 +75,6 @@ from collections import defaultdict
 import math
 
 
-global timing
-timing = []
-
-
 class Search:
     def __init__(self, game, state, player):
         self.game = game
@@ -131,6 +127,7 @@ class Search:
                 self.store_transition(state, action, successor)
                 if successor_is_new_state:
                     successor_hash = self.game.hash_state(successor)
+                    # FIXME: Hashes may only be used in extensions.
                     self.value[successor_hash] = self.evaluate_state(successor)
                     self.enqueue_for_expansion(successor)
             self.backpropagate(state)
@@ -164,11 +161,7 @@ class Search:
         raise NotImplementedError
 
     def run(self):
-        import datetime
-        t_0 = datetime.datetime.now()
         self.build_tree()
-        t_1 = datetime.datetime.now()
-        timing.append((t_1-t_0).total_seconds())
         self.analyze()
         return self.select_action()
 
@@ -406,6 +399,7 @@ class BestMovePlayer:
     """
     """
     def select_action(self):
+        # FIXME: hash_state should only be used by the Transition Table.
         state_hash = self.game.hash_state(self.current_state)
         value, actions = self.opinion[state_hash]
         return random.choice(actions)
