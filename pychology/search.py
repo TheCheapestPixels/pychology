@@ -86,6 +86,7 @@ class Search:
         self.current_state = state
         self.setup_storage()
         self.store_state(state)
+        self.setup_expansion()
         self.enqueue_for_expansion(state)
 
     def setup_storage(self):
@@ -185,7 +186,6 @@ class Search:
 class TranspositionTable:
     def setup_storage(self):
         self.known_states = {}  # hash -> state
-        self.expansion_queue = []  # hashes
         self.terminal_states = {}  # hash -> winner
         self.children = defaultdict(list)  # hash -> [(hash, action)]
         self.parents = defaultdict(list)  # hash -> [(hash, action)]
@@ -252,7 +252,12 @@ class StepLimitedExpansion:
 
 # State selection
 
-class TTSingleNodeBreadthSearch:
+class BasicExpansionQueue:
+    def setup_expansion(self):
+        self.expansion_queue = []  # hashes
+
+
+class SingleNodeBreadthSearch(BasicExpansionQueue):
     def enqueue_for_expansion(self, state):
         self.expansion_queue.append(state)
 
@@ -260,11 +265,11 @@ class TTSingleNodeBreadthSearch:
         try:
             state = self.expansion_queue.pop(0)
         except IndexError:
-            return []
+            state = []
         return [state]
 
 
-class TTSingleNodeDepthSearch:
+class SingleNodeDepthSearch(BasicExpansionQueue):
     def enqueue_for_expansion(self, state):
         self.expansion_queue.append(state)
 
@@ -276,7 +281,7 @@ class TTSingleNodeDepthSearch:
         return [state]
 
 
-class TTBreadthSearch:
+class BreadthSearch(BasicExpansionQueue):
     def enqueue_for_expansion(self, state):
         self.expansion_queue.append(state)
 
@@ -438,9 +443,8 @@ class TTAnalysis:
 class StateOfTheArt(
         TranspositionTable,         # Storage
         NodeLimitedExpansion,       # Tree expansion
-        TTSingleNodeBreadthSearch,  # State selection
-        #Portfolio,                  # Action expansion
-        AllCombinations,
+        SingleNodeBreadthSearch,    # State selection
+        AllCombinations,            # Action expansion
         ZeroSumPlayer,              # State evaluation
         Minimax,                    # Action evaluation
         BestMovePlayer,             # Action selection
@@ -453,7 +457,7 @@ class StateOfTheArt(
 class FixedPliesAI(
         TranspositionTable,         # Storage
         StepLimitedExpansion,       # Tree expansion
-        TTBreadthSearch,            # State selection
+        BreadthSearch,              # State selection
         AllCombinations,            # Action expansion
         ZeroSumPlayer,              # State evaluation
         Minimax,                    # Action evaluation
