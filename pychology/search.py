@@ -409,7 +409,6 @@ class BestMovePlayer:
 
 class TTAnalysis:
     def analyze(self):
-        print(f"Time: {timing[-1]} seconds")
         state_hash = self.game.hash_state(self.current_state)
         value, options = self.opinion[state_hash]
         print(f"Position score: {value}")
