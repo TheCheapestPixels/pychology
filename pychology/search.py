@@ -95,6 +95,9 @@ class Search:
         """
         raise NotImplementedError
 
+    def setup_expansion(self):
+        raise NotImplementedError
+
     def enqueue_for_expansion(self, state):
         raise NotImplementedError
         
@@ -245,6 +248,17 @@ class StepLimitedExpansion:
 
 # State selection
 
+class NoExpansionQueue:
+    def setup_expansion(self):
+        pass
+
+    def enqueue_for_expansion(self, state):
+        pass
+
+    def select_states_to_expand(self):
+        return []
+
+
 class BasicExpansionQueue:
     def setup_expansion(self):
         self.expansion_queue = []  # hashes
@@ -258,7 +272,7 @@ class SingleNodeBreadthSearch(BasicExpansionQueue):
         try:
             state = self.expansion_queue.pop(0)
         except IndexError:
-            state = []
+            return []
         return [state]
 
 
@@ -464,6 +478,7 @@ class FixedPliesAI(
 class RandomAI(
         TranspositionTable,
         NoExpansion,
+        NoExpansionQueue,
         AllCombinations,
         ZeroSumPlayer,
         Minimax,
