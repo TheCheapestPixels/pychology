@@ -1,23 +1,24 @@
 import sys
-from pychology.search import FixedPliesAI
+
+from pychology.search import TranspositionTable
+from pychology.search import NoExpansion
+from pychology.search import FullExpansion
+from pychology.search import NodeLimitedExpansion
+from pychology.search import StepLimitedExpansion
+from pychology.search import SingleNodeBreadthSearch
+from pychology.search import BreadthSearch
+from pychology.search import AllCombinations
+from pychology.search import ZeroSumPlayer
+from pychology.search import Minimax
+from pychology.search import RandomChooser
+from pychology.search import BestMovePlayer
+from pychology.search import Search
+from pychology.search import TTAnalysis
+
 from pychology.search import StateOfTheArt
+from pychology.search import RandomAI
 
 
-# Experimental code
-
-class LineRewardingAI(StateOfTheArt):
-    evaluation_function = 'line_rewarder'
-    node_limit = 10000
-
-
-class MonteCarloAI(StateOfTheArt):
-    evaluation_function = 'mcts'
-
-
-# The actual code
-
-#class DefaultAI(FixedPliesAI):
-#    expansion_steps = 4
 class DefaultAI(StateOfTheArt):
     node_limit = 10000
 
@@ -57,9 +58,23 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
 
 
 def play_interactively(game, ai_classes=None):
-    ai_players = game.query_ai_players()
     if ai_classes is None:
+        ai_players = game.query_ai_players()
         ai_classes = {p: DefaultAI for p in game.players()}
+    elif len(ai_classes) == 1:  # One spec given; Use for all AIs
+        ai_players = game.query_ai_players()
+        ai_classes = {p: ai_classes[0] for p in game.players()}
+    else:  # More than one spec; Map to players
+        # FIXME: This should be a matter of passing `strict=True` to
+        # zip, but that only works for Python 3.10+
+        if len(ai_classes) != len(game.players()):
+            raise Exception("Number of AI players differs from game player number.")
+        ai_classes = {p: ai
+                      for p, ai in zip(
+                              game.players(),
+                              ai_classes,
+                      )}
+        ai_players = [p for p, ai in ai_classes.items() if ai is not None]
     state = game.initial_state()
     repl(game, state, ai_players, ai_classes=ai_classes)
 
@@ -69,6 +84,13 @@ def auto_tournament(game, ai_classes=None):
     ai_players = game.players()
     if ai_classes is None:
         ai_classes = {p: DefaultAI for p in game.players()}
+    elif len(ai_classes) == 1:  # One spec given; Use for all AIs
+        ai_classes = {p: ai_classes[0] for p in game.players()}
+    else:  # More than one spec
+        # FIXME: Do we map each spec to one player, or do we pitch each
+        # of them against another one? With or without repetition? And
+        # don't forgot that each should play as each player, too.
+        raise Exception
     for i in range(100):
         print(i)
         state = game.initial_state()
@@ -83,6 +105,81 @@ def auto_tournament(game, ai_classes=None):
     median_time = sorted(timing)[int(len(timing)/2.0)]
     print(f"Min: {min_time}, Max: {max_time}, Mean: {mean_time}, Median: {median_time}")
     print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
+
+
+def assemble_search(spec_str):
+    properties = dict(
+        storage='tt',
+        limit_type='none',
+        select_action='best',
+        analysis=False,
+    )
+
+    # Pre-defined AIs
+    if spec_str == 'human':
+        return None
+    elif spec_str == 'sota':
+        return StateOfTheArt
+    elif spec_str == 'random':
+        return RandomAI
+    
+    # Parse the configuration string
+    for prop_spec in spec_str.split(","):
+        prop_type, _, prop_value = prop_spec.partition("=")
+        if prop_value:
+            properties[prop_type] = prop_value
+        else:
+            properties[prop_type] = True
+
+    # Assemble the class
+    bases = []
+    attribs = {}
+
+    storage_type = properties['storage']
+    if storage_type == 'tt':
+        bases.append(TranspositionTable)
+    else:
+        raise Exception(f"Unknown storage type '{storage_type}'.")
+
+    limit_type = properties["limit_type"]
+    if limit_type == "none":
+        bases.append(FullExpansion)
+    elif limit_type == "no_exp":
+        bases.append(NoExpansion)
+    elif limit_type == "plies":
+        bases.append(StepLimitedExpansion)
+        bases.append(BreadthSearch)
+        if 'limit' in properties:
+            attribs['expansion_steps'] = int(properties['limit'])
+    elif limit_type == 'nodes':
+        bases.append(NodeLimitedExpansion)
+        bases.append(SingleNodeBreadthSearch)
+        if 'limit' in properties:
+            attribs['node_limit'] = int(properties['limit'])
+    else:
+        raise Exception(f"Unknown limit type '{limit_type}'.")
+
+    bases.append(AllCombinations)
+    bases.append(ZeroSumPlayer)
+    bases.append(Minimax)
+    if 'eval_func' in properties:
+        attribs['evaluation_function'] = properties['eval_func']
+
+    action_selection = properties["select_action"]
+    if action_selection == 'best':
+        bases.append(BestMovePlayer)
+    elif action_selection == 'random':
+        bases.append(RandomChooser)
+    else:
+        raise Exception(f"Unknown action selector '{action_selection}'.")
+
+    if properties.get('analysis', False) and storage_type == 'tt':
+        bases.append(TTAnalysis)
+
+    bases.append(Search)
+
+    search = type('AssembledSearch', tuple(bases), attribs)
+    return search
 
 
 if __name__ == '__main__':
@@ -115,16 +212,15 @@ if __name__ == '__main__':
         print(f"Can't import game module {args.game}")
         raise e
 
-    # Decode AI specs
-    # No specs -> Use default AIs
-    # Exactly one spec: One for all
-    # Multiple specs -> Multiple options
-    #   One spec/ellipsis per game participant
-    #   Multiple AIs to be tested against each other
-    print(args.ai)
+    if not args.ai:
+        ai_classes = [DefaultAI]
+    elif len(args.ai) == 1:
+        ai_classes = [assemble_search(args.ai[0])]
+    else:
+        ai_classes = [assemble_search(ai) for ai in args.ai]
 
     # Run
     if args.tournament:
-        auto_tournament(game.Game)
+        auto_tournament(game.Game, ai_classes=ai_classes)
     else:
-        play_interactively(game.Game)
+        play_interactively(game.Game, ai_classes=ai_classes)
