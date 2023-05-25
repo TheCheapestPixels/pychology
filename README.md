@@ -154,28 +154,128 @@ tool to provide a textual interface to games.
 
 All of these functions then are put together in a class which gets
 passed to the search on its creation time, together with the current
-state and the player for which the search should find the best action:
+state and the player for which the search should find the best action.
+In this example, we use a random mover "search":
 
 ```python
-from pychology.search import Search
+from pychology.search import RandomAI
 
 
-search = Search(game, state, player)
+search = RandomAI(game, state, player)
 action = search.run()
 ```
 
-Note that this example is wrong, as `Search` is merely the base class
-from which actual search classes are created by inheriting both it and
-the classes which define the different capabilities of the search. If
-you run the code as shown, it *will* fail with an exception, as it is
-merely meant to be an illustration. However, multiple preconfigured
-searches currently exist, so if you exchange `Search` for
-`StateOfTheArt`, `FixedPliesAI`, or `RandomAI`, the code would work.
-...after a fashion.
+To assemble and configure a search, we use the `Search` class as the
+base, and add classes that implement aspects of the search, which the
+base class itself does not; It only manages the core cycle of the graph
+search algorithm, which consists of...
 
-FIXME: Here should follow a section explaining the expansion/evaluation
-cycle, and the different categories of extensions as well as their
-different implementations.
+* choosing the state(s) to expand during this cycle, and for each of
+  them...
+* determining whether any player has won the game in it (and doing
+  nothing with it if that is the case; Terminal states can not be
+  expanded further),
+* determining the combinations of actions that players can / might want
+  to take in this state, and for each of them...
+* determining the successor state that doing so would lead to,
+* storing that state and transition, 
+* and if the state is not known yet, evaluating the state and enqueue it
+  for expansion.
+* Finally, once all actions are processed and all successors created and
+  evaluated, the original state is re-evaluated (now based on its
+  successors' values, not its own), and the resulting value is
+  recursively passed on to its parent(s), which then is also
+  re-evaluated, and so on, until the updated value has reached every
+  node for which it is relevant.
+
+The core loop itself is embedded into a loop which steps it until some
+termination condition is met, e.g. the search graph is fully expanded,
+has grown beyond a certain number of nodes, or has completely searched
+the graph up to a certain depth.
+
+However, it specifies nothing at all about how each step in particular
+should be performed, and those implementation details can radically
+influence how the search performs in different scenarios. They can be
+categorized into several aspects of the search, each encapsulating one
+to three functions alluded to in the explanation of the core loop:
+
+* Storage: Sets up the data structure in which states and the
+  transitions between them are stored, allows for those steps to be
+  done, and manages the backpropagation of updated state evaluations
+  through the relevant nodes. Currently, only a transposition table is
+  implemented.
+* Tree expansion: Steps the core loop, within the limits it implements.
+* State selection: Typically a FIFO or LIFO queue, making the search
+  happen breadth-first or depth-first. A priority queue (e.g. for A*) is
+  planned.
+* Action expansion: Creates a list of move combinations that players may
+  want to take. Typically, all legal possibilities are considered, but
+  if doing so leads to too high a branching factor, functions that
+  leverage expert knowledge for a game (or, theoretically at this time,
+  machine learning models) may create more selective lists.
+* State evaluation: A game's evaluation functions provide a value for a
+  state from each player's perspective. This capability combines those
+  values into one overall score, as seen from the perspective of the
+  player for who we are doing the search. For example, in the game Four
+  in a Row, each player's heuristic evaluation score can be based on how
+  many lines there are with which the player can place winning lines,
+  and how many pieces they have put into each of those lines already.
+  The state evaluation then can, for example, subtract the opponent's
+  value from the searching player's value, making the search consider
+  blocking the opponent's lines as valuable as preparing one's own
+  lines; This approach considers games to be zero sum games.
+* Action evaluation: Once a state has been expanded, each action that a
+  player can take can be valued based on the states that it can lead to;
+  These may be multiple states if other players may also contribute
+  actions to the move. By extension, the expanded state itself is also
+  given a value based on those of the actions. The typical approach to
+  this is minimax (the game theory one, not the tree search algorithm
+  one which is based on the former). We assume that whatever we do, the
+  opponent will do whatever is worst for us and selects the transition
+  which will minimize the score for our action. Between those options we
+  then choose the action providing the highest score (the best of all
+  the worst options), or, more precisely, store all the best actions (as
+  multiple may have the same value) for later action selection.
+* Action selection: Chooses the action to take based on the current
+  knowledge, randomness, or whatever else may come to mind.
+* Analysis: With this optional capability, information about the search
+  that was just performed may be extracted. Useful for debugging and
+  performance measurement.
+
+
+And when we put this all together:
+
+```python
+from pychology.search import TranspositionTable, NodeLimitedExpansion,
+    SingleNodeBreadthSearch, AllCombinations, ZeroSumPlayer, Minimax,
+    BestMovePlayer, Search
+
+
+class MySearch(
+    TranspositionTable,       # Storage: Directed graph
+    NodeLimitedExpansion,     # Tree expansion: Abort the expansion loop
+                              # once the limit set by the `node_limit`
+                              # has been reached or exceeded.
+    SingleNodeBreadthSearch,  # State selection: Expand one node at a
+                              # time, in the order that successors are
+                              # found in
+    AllCombinations,          # Action expansion: Consider all
+                              # combinations of legal moves.
+    ZeroSumPlayer,            # State evaluation: A state's value is the
+                              # player value minus all opponent values.
+    Minimax,                  # Action evaluation: Expect opponents to
+                              # make the move worst for us, and us to
+                              # make the one best for us.
+    BestMovePlayer,           # Action selection: Choose the highest-
+                              # valued successor to move to.
+    Search,
+):
+    node_limit = 10000
+
+
+search = MySearch(game, state, player)
+action = search.run()
+```
 
 
 TODO
@@ -196,7 +296,7 @@ TODO
       * Recording activation, return values, and resets frame by frame
     * Tree visualization and editing in Panda3D
   * Documentation
-    * Separate detailed page
+    * Separate course-style page
 * Search
   * Algorithms
     * Alpha-Beta Pruning
@@ -212,18 +312,7 @@ TODO
       * https://poker.cs.ualberta.ca/publications/NIPS07-cfr.pdf
       * https://towardsdatascience.com/counterfactual-regret-minimization-ff4204bf4205?gi=a09c56e9300c
     * Action selection: Shortest beat path
-  * Hacks
-    * Early termination of expansion if the root node has only one
-      action available
-    * A state, once expanded, is not used anymore, and can be removed
-      from memory; Only its metadata is what we are after.
-  * Tooling
-    * REPL
-      * Command line arguments
-        * Tournament parametrization
-	* Make more things available through `repl.assemble_search`.
-      * CSV / JSON output
-  * Cleanup
+  * Search capabilities
     * State selection
       * Add priority queue
     * Action evaluation
@@ -231,10 +320,24 @@ TODO
         accessing a game's evaluation function dictionary.
       * Make MCTS (currently in `four_in_a_row.py`) available without
         accessing a game's evaluation function dictionary.
+    * Analysis
+      * Add timing again
+      * Provide API to query for collected data
+      * Make printing optional
+  * Tooling
+    * REPL
+      * Command line arguments
+        * Tournament parametrization
+	* Make more things available through `repl.assemble_search`.
+      * CSV / JSON output
   * Documentation
-    * README: More explanations
-    * Separate, detailed page, akin to a course
+    * Separate course-style page
     * Docstrings; Especially descriptions of lists / dicts transferred.
+  * Hacks
+    * Early termination of expansion if the root node has only one
+      action available.
+    * A state, once expanded, is not used anymore, and can be removed
+      from memory; Only its metadata is what we are after.
   * Compilation: Refactor code for use with Cython / PyPy / mypyc and
     test speed improvements
 * Planning
