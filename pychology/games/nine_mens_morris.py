@@ -96,6 +96,10 @@ def players():
     return [Player.X, Player.O]
 
 
+def outcomes():
+    return {Player.X: 'X', Player.O: 'O'}
+
+
 def initial_state():
     board = [None] * 24
     men_set = 0
@@ -325,6 +329,7 @@ def query_ai_players():
 class Game:
     initial_state = initial_state
     game_winner = game_winner
+    outcomes = outcomes
     legal_moves = legal_moves
     make_move = make_move
     players = players

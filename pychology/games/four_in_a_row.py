@@ -54,6 +54,10 @@ def players():
     return [X, O]
 
 
+def outcomes():
+    return {X: 'X', O: 'O', DRAW: 'Draw'}
+
+
 def initial_state():
     board = [0 for _ in range(ROWS * COLUMNS)]
     return board
@@ -239,6 +243,7 @@ def query_ai_players():
 class Game:
     initial_state = initial_state
     game_winner = game_winner
+    outcomes = outcomes
     legal_moves = legal_moves
     make_move = make_move
     players = players

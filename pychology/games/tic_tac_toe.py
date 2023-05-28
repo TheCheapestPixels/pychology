@@ -19,6 +19,14 @@ lines = [
 
 ### Game-defining functions
 
+def players():
+    return [X, O]
+
+
+def outcomes():
+    return {X: 'X', O: 'O', DRAW: 'Draw'}
+
+
 def initial_state():
     board = [None, None, None, None, None, None, None, None, None]
     player = X
@@ -66,9 +74,6 @@ def make_move(state, moves):
 
 
 ### Game-interpreting functions
-
-def players():
-    return [X, O]
 
 def hash_state(state):
     board = state['board']
@@ -154,6 +159,7 @@ def query_ai_players():
 class Game:
     initial_state = initial_state
     game_winner = game_winner
+    outcomes = outcomes
     legal_moves = legal_moves
     make_move = make_move
     players = players

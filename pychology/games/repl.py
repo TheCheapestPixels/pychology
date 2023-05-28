@@ -1,4 +1,5 @@
 import sys
+from itertools import permutations
 
 from pychology.search import TranspositionTable
 from pychology.search import NoExpansion
@@ -58,6 +59,33 @@ def repl(game, state, ai_players, visuals=True, ai_classes=None):
 
 
 def play_interactively(game, ai_classes=None):
+    ai_players, ai_classes = map_ais_to_players(game, ai_classes)
+    state = game.initial_state()
+    repl(game, state, ai_players, ai_classes=ai_classes)
+
+
+def auto_tournament(game, ai_classes=None, rounds=100):
+    results = {o: 0 for o in game.outcomes().keys()}
+    ai_players, ai_classes = map_ais_to_players(game, ai_classes)
+    for i in range(rounds):
+        print(i)
+        state = game.initial_state()
+        winner = repl(
+            game, state, ai_players,
+            visuals=False, ai_classes=ai_classes,
+        )
+        results[winner] += 1
+    # max_time = max(timing)
+    # min_time = min(timing)
+    # mean_time = sum(timing) / len(timing)
+    # median_time = sorted(timing)[int(len(timing)/2.0)]
+    # print(f"Min: {min_time}, Max: {max_time}, Mean: {mean_time}, Median: {median_time}")
+    for player, result in results.items():
+        player_str = game.outcomes()[player]
+        print(f"{player_str}: {result}")
+
+
+def map_ais_to_players(game, ai_classes):
     if ai_classes is None:
         ai_players = game.query_ai_players()
         ai_classes = {p: DefaultAI for p in game.players()}
@@ -75,36 +103,7 @@ def play_interactively(game, ai_classes=None):
                               ai_classes,
                       )}
         ai_players = [p for p, ai in ai_classes.items() if ai is not None]
-    state = game.initial_state()
-    repl(game, state, ai_players, ai_classes=ai_classes)
-
-
-def auto_tournament(game, ai_classes=None):
-    results = {p: 0 for p in game.players()}
-    ai_players = game.players()
-    if ai_classes is None:
-        ai_classes = {p: DefaultAI for p in game.players()}
-    elif len(ai_classes) == 1:  # One spec given; Use for all AIs
-        ai_classes = {p: ai_classes[0] for p in game.players()}
-    else:  # More than one spec
-        # FIXME: Do we map each spec to one player, or do we pitch each
-        # of them against another one? With or without repetition? And
-        # don't forgot that each should play as each player, too.
-        raise Exception
-    for i in range(100):
-        print(i)
-        state = game.initial_state()
-        winner = repl(
-            game, state, ai_players,
-            visuals=True, ai_classes=ai_classes,
-        )
-        results[winner] += 1
-    max_time = max(timing)
-    min_time = min(timing)
-    mean_time = sum(timing) / len(timing)
-    median_time = sorted(timing)[int(len(timing)/2.0)]
-    print(f"Min: {min_time}, Max: {max_time}, Mean: {mean_time}, Median: {median_time}")
-    print(f"X   : {results[X]}\nO   : {results[O]}\nDraw: {results[DRAW]}\n")
+    return ai_players, ai_classes
 
 
 def assemble_search(spec_str):
@@ -173,8 +172,11 @@ def assemble_search(spec_str):
     else:
         raise Exception(f"Unknown action selector '{action_selection}'.")
 
-    if properties.get('analysis', False) and storage_type == 'tt':
-        bases.append(TTAnalysis)
+    if properties.get('analysis', False):
+        if storage_type == 'tt':
+            bases.append(TTAnalysis)
+        else:
+            raise Exception("Storage lacks corresponding analysis capability.")
 
     bases.append(Search)
 
@@ -200,6 +202,10 @@ if __name__ == '__main__':
         help="Collects statistics of AIs playing against each other.",
     )
     parser.add_argument(
+        '-r', '--rounds',
+        help="Collects statistics of AIs playing against each other.",
+    )
+    parser.add_argument(
         'ai',
         nargs='*',
         help="Specifications for AI players.",
@@ -221,6 +227,9 @@ if __name__ == '__main__':
 
     # Run
     if args.tournament:
-        auto_tournament(game.Game, ai_classes=ai_classes)
+        kwargs = dict(ai_classes=ai_classes)
+        if args.rounds:
+            kwargs['rounds'] = int(args.rounds)
+        auto_tournament(game.Game, **kwargs)
     else:
         play_interactively(game.Game, ai_classes=ai_classes)
