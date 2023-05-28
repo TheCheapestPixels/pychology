@@ -315,11 +315,13 @@ TODO
   * Search capabilities
     * State selection
       * Add priority queue
-    * Action evaluation
+    * State evaluation
       * Make default evaluation based on `game_winner` available without
         accessing a game's evaluation function dictionary.
       * Make MCTS (currently in `four_in_a_row.py`) available without
         accessing a game's evaluation function dictionary.
+    * Action evaluation
+      * https://www.researchgate.net/profile/Paul-Purdom/publication/220091335_Experiments_on_Alternatives_to_Minimax/links/0912f51470146478b1000000/Experiments-on-Alternatives-to-Minimax.pdf
     * Analysis
       * Add timing again
       * Provide API to query for collected data
