@@ -80,16 +80,6 @@ def hash_state(state):
     h = ''.join([{X: 'X', O: 'O', None: ' '}[t] for t in board])
     return h
 
-def evaluate_state(state):
-    winner = game_winner(state)
-    if winner == X:
-        return {X: math.inf, O: -math.inf}
-    elif winner == O:
-        return {X: -math.inf, O: math.inf}
-    else:
-        return {X: 0, O: 0}
-
-
 ### User interaction
 
 def visualize_state(state):
@@ -164,7 +154,6 @@ class Game:
     make_move = make_move
     players = players
     hash_state = hash_state
-    evaluation_funcs = {'default': evaluate_state}
     query_ai_players = query_ai_players
     visualize_state = visualize_state
     query_action = query_action

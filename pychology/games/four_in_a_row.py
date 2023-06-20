@@ -249,10 +249,6 @@ class Game:
     players = players
     hash_state = hash_state
     query_ai_players = query_ai_players
-    evaluation_funcs = {
-        'default': evaluate_state_naively,
-        'line_rewarder': evaluate_state_heuristically,
-        'mcts': evaluate_state_mcts,
-    }
+    evaluation_funcs = {'default': evaluate_state_heuristically}
     visualize_state = visualize_state
     query_action = query_action

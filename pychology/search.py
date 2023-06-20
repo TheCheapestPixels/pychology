@@ -325,13 +325,15 @@ class AllCombinations:
 
 
 class Portfolio(AllCombinations):
+    portfolio = 'default'
+
     def get_expanding_actions(self, state):
         moves = self.game.legal_moves(state)
         players = list(moves.keys())
         portfolios = self.game.portfolios
         portfolio = {}
         for player in players:
-            behavior = portfolios['ncw'](state, moves)
+            behavior = portfolios[self.portfolio](state, moves)
             if not behavior:  # A portfolio can't generate any moves...
                 return []  # ...and thus this whole state is abandoned.
             portfolio[player] = behavior
@@ -371,7 +373,7 @@ class RacerPlayer:
         return value
 
 
-# Action evalution
+# Action evalution (per player)
 
 class GameBasedEvaluation:
     evaluation_function = 'default'
@@ -380,7 +382,47 @@ class GameBasedEvaluation:
         return self.game.evaluation_funcs[self.evaluation_function](state)
 
 
-class Minimax(GameBasedEvaluation):
+class WinnerBasedEvaluation:
+    def evaluate_state_by_player(self, state):
+        players = self.game.players()
+        winner = self.game.game_winner(state)
+        if not winner:
+            return {p: 0 for p in players}
+        else:
+            valuations = {p: -math.inf for p in players}
+            valuations[winner] = math.inf
+            return valuations
+
+
+class MonteCarloBasedEvaluation:
+    mcts_width = 1
+
+    def evaluate_state_by_player(self, state):
+        players = self.game.players()
+        winner = self.game.game_winner(state)
+        if winner is None:
+            valuation = {p: 0 for p in players}
+            for _ in range(self.mcts_width):
+                loop_state = state
+                while not (winner := self.game.game_winner(loop_state)):
+                    moves = self.game.legal_moves(loop_state)
+                    choices = {player: None for player in moves}
+                    for player, options in moves.items():
+                        if options:
+                            choices[player] = random.choice(options)
+                    loop_state = self.game.make_move(loop_state, choices)
+                if winner in players:
+                    valuation[winner] += 1
+            return valuation
+        else:
+            valuations = {p: -math.inf for p in players}
+            valuations[winner] = math.inf
+            return valuations
+
+
+# Action Evaluation (game theory)
+    
+class Minimax:
     def reevaluate_node(self, state):
         score = defaultdict(lambda: math.inf)
         state_hash = self.game.hash_state(state)
@@ -419,7 +461,7 @@ class BestMovePlayer:
         return random.choice(actions)
 
 
-### Analysis
+### Analysis and debug
 
 class TTAnalysis:
     def analyze(self):
@@ -445,6 +487,10 @@ class TTAnalysis:
                         level_states.add(child)
 
 
+class Debug:
+    name="debug"
+
+
 ### Complete searches.
 
 class StateOfTheArt(
@@ -453,7 +499,8 @@ class StateOfTheArt(
         SingleNodeBreadthSearch,    # State selection
         AllCombinations,            # Action expansion
         ZeroSumPlayer,              # State evaluation
-        Minimax,                    # Action evaluation
+        MonteCarloBasedEvaluation,  # Action evaluation per player
+        Minimax,                    # Action evaluation overall
         BestMovePlayer,             # Action selection
         TTAnalysis,                 # Analysis (optional)
         Search,

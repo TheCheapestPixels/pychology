@@ -2,6 +2,7 @@ import sys
 from itertools import permutations
 
 from pychology.search import TranspositionTable
+from pychology.search import NoExpansionQueue
 from pychology.search import NoExpansion
 from pychology.search import FullExpansion
 from pychology.search import NodeLimitedExpansion
@@ -9,12 +10,17 @@ from pychology.search import StepLimitedExpansion
 from pychology.search import SingleNodeBreadthSearch
 from pychology.search import BreadthSearch
 from pychology.search import AllCombinations
+from pychology.search import Portfolio
 from pychology.search import ZeroSumPlayer
+from pychology.search import WinnerBasedEvaluation
+from pychology.search import MonteCarloBasedEvaluation
+from pychology.search import GameBasedEvaluation
 from pychology.search import Minimax
 from pychology.search import RandomChooser
 from pychology.search import BestMovePlayer
 from pychology.search import Search
 from pychology.search import TTAnalysis
+from pychology.search import Debug
 
 from pychology.search import StateOfTheArt
 from pychology.search import RandomAI
@@ -64,26 +70,51 @@ def play_interactively(game, ai_classes=None):
     repl(game, state, ai_players, ai_classes=ai_classes)
 
 
-def auto_tournament(game, ai_classes=None, rounds=100):
-    results = {o: 0 for o in game.outcomes().keys()}
-    ai_players, ai_classes = map_ais_to_players(game, ai_classes)
-    for i in range(rounds):
-        print(i)
-        state = game.initial_state()
-        winner = repl(
-            game, state, ai_players,
-            visuals=False, ai_classes=ai_classes,
-        )
-        results[winner] += 1
-    # max_time = max(timing)
-    # min_time = min(timing)
-    # mean_time = sum(timing) / len(timing)
-    # median_time = sorted(timing)[int(len(timing)/2.0)]
-    # print(f"Min: {min_time}, Max: {max_time}, Mean: {mean_time}, Median: {median_time}")
-    for player, result in results.items():
-        player_str = game.outcomes()[player]
-        print(f"{player_str}: {result}")
+def auto_tournament(game, ai_classes, rounds=100):
+    tournament_results = {}
+    all_ai_classes = ai_classes
+    matchups = list(permutations(ai_classes, len(game.players())))
+    progress_step = 100.0 / len(matchups)
+    from progressbar import ProgressBar, AnimatedMarker, Percentage, Bar
+    pbar = ProgressBar(widgets=[AnimatedMarker(), Percentage(), Bar()], maxval=100.0).start()
 
+    for matchup_idx, ai_classes in enumerate(matchups):
+        match_results = {o: 0 for o in game.outcomes().keys()}
+        ai_players, ai_classes = map_ais_to_players(game, ai_classes)
+        
+        for i in range(rounds):
+            pbar.update(progress_step * (matchup_idx + ((i + 1) / rounds)))
+            state = game.initial_state()
+            winner = repl(
+                game, state, ai_players,
+                visuals=False, ai_classes=ai_classes,
+            )
+            match_results[winner] += 1
+        tournament_results[tuple(ai_cls for ai_cls in ai_classes.values())] = match_results
+    print()
+    visualize_tournament_result(all_ai_classes, tournament_results)
+
+
+def visualize_tournament_result(ai_classes, results):
+    from texttable import Texttable
+
+    table = Texttable()
+    table.set_cols_align(["l"] + ["c"] * len(ai_classes))
+    table.set_cols_valign(["c"] * (len(ai_classes) + 1))
+    lines = []
+    lines.append(["X \ O"] + [ai.name for ai in ai_classes])
+    for line_ai in ai_classes:
+        line = [line_ai.name]
+        for column_ai in ai_classes:
+            if (line_ai, column_ai) in results:
+                cell_results = list(results[(line_ai, column_ai)].values())
+                line.append(f"{cell_results[0]} \ {cell_results[1]} ({cell_results[2]})")
+            else:
+                line.append("-----")
+        lines.append(line)
+    table.add_rows(lines)
+    print(table.draw())
+    
 
 def map_ais_to_players(game, ai_classes):
     if ai_classes is None:
@@ -141,10 +172,13 @@ def assemble_search(spec_str):
         raise Exception(f"Unknown storage type '{storage_type}'.")
 
     limit_type = properties["limit_type"]
+    #import pdb; pdb.set_trace()
     if limit_type == "none":
         bases.append(FullExpansion)
+        bases.append(BreadthSearch)
     elif limit_type == "no_exp":
         bases.append(NoExpansion)
+        bases.append(NoExpansionQueue)
     elif limit_type == "plies":
         bases.append(StepLimitedExpansion)
         bases.append(BreadthSearch)
@@ -158,11 +192,28 @@ def assemble_search(spec_str):
     else:
         raise Exception(f"Unknown limit type '{limit_type}'.")
 
-    bases.append(AllCombinations)
+    if portfolio := properties.get('portfolio', False):
+        bases.append(Portfolio)
+        if isinstance(portfolio, str):
+            attribs['portfolio'] = portfolio
+        else:
+            attribs['portfolio'] = 'default'
+    else:
+        bases.append(AllCombinations)
     bases.append(ZeroSumPlayer)
-    bases.append(Minimax)
     if 'eval_func' in properties:
-        attribs['evaluation_function'] = properties['eval_func']
+        bases.append(GameBasedEvaluation)
+        func = properties['eval_func']
+        if isinstance(func, str):
+            attribs['evaluation_function'] = func
+    else:
+        if 'mcts' in properties:
+            bases.append(MonteCarloBasedEvaluation)
+            if isinstance(properties['mcts'], int):
+                attribs['mcts_width'] = properties['mcts']
+        else:
+            bases.append(WinnerBasedEvaluation)
+    bases.append(Minimax)
 
     action_selection = properties["select_action"]
     if action_selection == 'best':
@@ -178,9 +229,16 @@ def assemble_search(spec_str):
         else:
             raise Exception("Storage lacks corresponding analysis capability.")
 
+    if properties.get('name', False):
+        bases.append(Debug)
+        attribs['name'] = properties['name']
+
     bases.append(Search)
 
-    search = type('AssembledSearch', tuple(bases), attribs)
+    name = 'AssembledSearch'
+    if 'name' in attribs:
+        name = attribs['name']
+    search = type(name, tuple(bases), attribs)
     return search
 
 

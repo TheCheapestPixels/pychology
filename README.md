@@ -316,10 +316,7 @@ TODO
     * State selection
       * Add priority queue
     * State evaluation
-      * Make default evaluation based on `game_winner` available without
-        accessing a game's evaluation function dictionary.
-      * Make MCTS (currently in `four_in_a_row.py`) available without
-        accessing a game's evaluation function dictionary.
+      * Rip win-based and MCTS evaluations out of games
     * Action evaluation
       * https://www.researchgate.net/profile/Paul-Purdom/publication/220091335_Experiments_on_Alternatives_to_Minimax/links/0912f51470146478b1000000/Experiments-on-Alternatives-to-Minimax.pdf
     * Analysis
@@ -329,9 +326,13 @@ TODO
   * Tooling
     * REPL
       * Command line arguments
-        * Tournament parametrization
 	* Make more things available through `repl.assemble_search`.
-      * CSV / JSON output
+      * Tournaments
+        * Have visualizations for other games than "two players, draws
+	  possible".
+	* Reorder matches to build up results equally over all of them,
+	  making results human-accessible earlier.
+        * CSV / JSON output
   * Documentation
     * Separate course-style page
     * Docstrings; Especially descriptions of lists / dicts transferred.

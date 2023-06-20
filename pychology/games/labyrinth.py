@@ -5,19 +5,22 @@ level_1 = "I...O"
 
 
 level_2 = """
-..I.. ...
-  .   .
-..... ...
-.     .
-....... .
-.       .
-. .......
-. .   . .
-... ... .
-        .
-.........
-      .
-      O"""[1:]
+"           "
+" ..I.. ... "
+"   .   .   "
+" ..... ... "
+" .     .   "
+" ....... . "
+" .       . "
+" . ....... "
+" . .   . . "
+" ... ... . "
+"         . "
+" ......... "
+"       .   "
+"       O   "
+
+"""[1:]
 
 
 level_3 = """
@@ -64,13 +67,21 @@ I.
                                                                                                    O"""[1:]
 
 
-level = level_2
+level = level_3
+
+
+PLAYER = 1
 
 
 ### Game definition
 
 def players():
-    return None
+    return [PLAYER]
+
+
+def outcomes():
+    return {PLAYER: 'player'}
+
 
 def initial_state():
     position = None
@@ -92,7 +103,7 @@ def initial_state():
 
 def game_winner(state):
     if state['position'] == state['way_out']:
-        return [None]
+        return PLAYER
 
 
 def legal_moves(state):
@@ -107,7 +118,7 @@ def legal_moves(state):
         moves.append('a')
     if (l, t+1) in tiles:
         moves.append('d')
-    return {None: moves}
+    return {PLAYER: moves}
 
 
 def make_move(state, moves):
@@ -115,7 +126,7 @@ def make_move(state, moves):
     old_position = state['position']
     l, t = old_position
     moves_made = state['moves_made']
-    move = moves[None]
+    move = moves[PLAYER]
     if move == "w":
         position = (l-1, t)
     elif move == "s":
@@ -133,25 +144,26 @@ def make_move(state, moves):
 
 def evaluate_state(state):
     score = -len(state['moves_made'])
+    return {PLAYER: score}
+
+
+def evaluate_state_with_euclidean(state):
+    score = -len(state['moves_made'])
     l_p, t_p = state['position']
     l_o, t_o = state['way_out']
-    #dist = math.sqrt((l_o - l_p)**2 + (t_o - t_p)**2)
-    dist = 0
-    return {None: score-dist}
+    dist = math.sqrt((l_o - l_p)**2 + (t_o - t_p)**2)
+    return {PLAYER: score-dist}
 
 
 def non_cyclic_walker(state, moves):
     filtered_moves = []
-    for move in moves[None]:
-        successor = make_move(state, {None: move})
+    for move in moves[PLAYER]:
+        successor = make_move(state, {PLAYER: move})
         if successor['position'] in state['moves_made']:
             # Drop this cyclical move.
             continue
         filtered_moves.append(move)
     return filtered_moves
-
-
-portfolios = {'ncw': non_cyclic_walker}
 
 
 ### Tooling
@@ -205,7 +217,7 @@ def query_ai_players():
     while ai_players is None:
         i = input("> ")
         if i in ['Y', 'y']:
-            ai_players = [None]
+            ai_players = [PLAYER]
         elif i in ['N', 'n']:
             ai_players = []
         else:
@@ -219,9 +231,17 @@ class Game:
     legal_moves = legal_moves
     make_move = make_move
     players = players
+    outcomes = outcomes
     hash_state = hash_state
-    evaluation_funcs = {'default': evaluate_state}
-    portfolios = portfolios
+    evaluation_funcs = {
+        'default': evaluate_state,
+        'euclidean': evaluate_state_with_euclidean,
+    }
+    portfolios = {
+        'ncw': non_cyclic_walker,
+    }
     query_ai_players = query_ai_players
     visualize_state = visualize_state
     query_action = query_action
+
+
