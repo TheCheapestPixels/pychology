@@ -108,7 +108,12 @@ def visualize_tournament_result(ai_classes, results):
         for column_ai in ai_classes:
             if (line_ai, column_ai) in results:
                 cell_results = list(results[(line_ai, column_ai)].values())
-                line.append(f"{cell_results[0]} \ {cell_results[1]} ({cell_results[2]})")
+                if len(cell_results) == 2:
+                    line.append(f"{cell_results[0]} \ {cell_results[1]}")
+                elif len(cell_results) == 3:
+                    line.append(f"{cell_results[0]} \ {cell_results[1]} ({cell_results[2]})")
+                else:
+                    raise Exception("Can currently format only results with two or three elements.")
             else:
                 line.append("-----")
         lines.append(line)
