@@ -491,6 +491,29 @@ class Debug:
     name="debug"
 
 
+### Evaluation function boilerplate
+
+def evaluate_state(game_winner, players, *eval_funcs, weights=None):
+    if weights is None:
+        weights = [1.0] * len(eval_funcs)
+    elif len(eval_funcs) != len(weights):
+        raise Exception("Different number of evaluation functions and weights.")
+    def inner(state):
+        winner = game_winner(state)
+        if winner in players():
+            scores = {p: -math.inf for p in players()}
+            scores[winner] = math.inf
+            return scores
+        else:
+            scores = [func(state) for func in eval_funcs]
+            totals = {}
+            for p in scores[0].keys():
+                p_scores = [s[p] for s in scores]
+                totals[p] = sum(ps * w for ps, w in zip(p_scores, weights))
+            return totals
+    return inner
+
+
 ### Complete searches.
 
 class StateOfTheArt(

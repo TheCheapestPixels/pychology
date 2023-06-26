@@ -1,6 +1,8 @@
 import math
 import random
 
+from pychology.search import evaluate_state
+
 
 X = 1
 O = 2
@@ -109,65 +111,18 @@ def hash_state(state):
     return sum(b * 3**e for b, e in zip(state, exponents))
 
 
-def evaluate_state_naively(state):
-    winner = game_winner(state)
-    if winner == X:
-        return {X: math.inf, O: -math.inf}
-    elif winner == O:
-        return {X: -math.inf, O: math.inf}
-    else:
-        return {X: 0, O: 0}
+### State evaluation
 
-
-def evaluate_state_mcts(state):
-    winner = game_winner(state)
-    if winner == X:
-        return {X: math.inf, O: -math.inf}
-    elif winner == O:
-        return {X: -math.inf, O: math.inf}
-    else:
-        while not (winner := game_winner(state)):
-            moves = legal_moves(state)
-            choices = {player: None for player in moves}
-            for player, options in moves.items():
-                if options:
-                    choices[player] = random.choice(options)
-            state = make_move(state, choices)
-        if winner == DRAW:
-            return {X: 0, O: 0}
-        score = {X: -1, O: -1}
-        score[winner] = 1
-        return score
-
-
-def evaluate_state_heuristically(state):
-    def has_won(player):
-        score = {p: -math.inf for p in players()}
-        score[player] = math.inf
-        return score
-    def draw():
-        return {p: 0 for p in players()}
-
-    line_chances = draw()
-    # Is there a regular winner?
+def line_rewarder(state):
+    scores = {p: 0 for p in players()}
     for tile_ids in win_lines:
-        tiles = t_1, t_2, t_3, t_4 = [state[t] for t in tile_ids]
-        if t_1 != 0:
-            if t_1 == t_2 == t_3 == t_4:
-                return has_won(t_1)
-            for p in players():
-                player_tiles_in_line = [t==p for t in tiles]
-                if len(player_tiles_in_line) > 0:
-                    if all(t==0 or t==p for t in tiles):
-                        num_own_tiles = len(player_tiles_in_line)
-                        line_chances[p] += 4 ** (num_own_tiles - 1)
-    # If the board is filled and there is no winner, it's a draw.
-    legal = [c for c in range(COLUMNS)
-             if state[c + (ROWS - 1) * COLUMNS] == 0]
-    if len(legal) == 0:
-        return draw()
-    # So there's no winner, and the board isn't full; The game goes on.
-    return line_chances
+        tiles = [state[t] for t in tile_ids]
+        line_players = set(t for t in tiles if t!=0)
+        if len(line_players) == 1:
+            player = line_players.pop()
+            stones = sum([1 for t in tiles if t==player])
+            scores[player] += 4 ** (stones - 1)
+    return scores
 
 
 def visualize_state(state):
@@ -249,6 +204,8 @@ class Game:
     players = players
     hash_state = hash_state
     query_ai_players = query_ai_players
-    evaluation_funcs = {'default': evaluate_state_heuristically}
+    evaluation_funcs = {
+        'default': evaluate_state(game_winner, players, line_rewarder),
+    }
     visualize_state = visualize_state
     query_action = query_action

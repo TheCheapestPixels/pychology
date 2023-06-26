@@ -1,6 +1,8 @@
 from enum import Enum
 import math
 
+from pychology.search import evaluate_state
+
 
 #  1---------- 2---------- 3
 #  |           |           |
@@ -106,18 +108,6 @@ def initial_state():
     phase = Phase.SETTING
     player = Player.X
     return dict(board=board, men_set=men_set, phase=phase, player=player)
-# def initial_state():
-#     board = [None] * 24
-#     board[0] = Player.X
-#     board[1] = Player.X
-#     board[14] = Player.X
-#     board[9] = Player.O
-#     board[15] = Player.O
-#     board[22] = Player.O
-#     men_set = 2
-#     phase = Phase.MOVING
-#     player = Player.X
-#     return dict(board=board, men_set=men_set, phase=phase, player=player)
 
 
 def legal_moves(state):
@@ -226,15 +216,21 @@ def hash_state(state):
     return ''.join([board_str, men_set_str, phase_str, player_str])
 
 
-def evaluate_state(state):
-    winner = game_winner(state)
-    if winner == Player.X:
-        return {Player.X: math.inf, Player.O: -math.inf}
-    elif winner == Player.O:
-        return {Player.X: -math.inf, Player.O: math.inf}
-    else:
-        return {p: len([t for t in state['board'] if t==p]) for p in players()}
+def count_men(state):
+    return {p: len([t for t in state['board'] if t==p]) for p in players()}
 
+
+def line_rewarder(state):
+    rewards = {p: 0 for p in players()}
+    for line in lines:
+        player_men = [state['board'][place] for place in line]
+        for player in players():
+            num_own_men = len(list(1 for p in player_men if p==player))
+            num_empty = len(list(1 for p in player_men if p is None))
+            if num_own_men + num_empty == len(line):  # Only own pieces
+                rewards[player] += {0: 0, 1: 1, 2: 3, 3: 0}[num_own_men]
+    return rewards
+    
 
 def visualize_state(state):
     str_reprs = {
@@ -335,6 +331,9 @@ class Game:
     players = players
     hash_state = hash_state
     query_ai_players = query_ai_players
-    evaluation_funcs = {'default': evaluate_state}
+    evaluation_funcs = {
+        'default': evaluate_state(game_winner, players, count_men),
+        'mixed': evaluate_state(game_winner, players, count_men, line_rewarder, weights=[10.0, 1.0]),
+    }
     visualize_state = visualize_state
     query_action = query_action
