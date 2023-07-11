@@ -139,6 +139,8 @@ class Search:
     def build_tree(self):
         raise NotImplementedError
 
+                #for successor_hash, action in self.children[here_hash]:
+                #    successor_value = self.value[successor_hash]
     def evaluate_state(self, state):
         """
         Determine the heuristic value of the state, without having to
@@ -166,12 +168,16 @@ class Search:
     def run(self):
         self.build_tree()
         self.analyze()
+        self.post_expansion_debug()
         return self.select_action()
 
     def analyze(self):
         """
         Optional step at the end of running the search.
         """
+        pass
+
+    def post_expansion_debug(self):
         pass
 
 
@@ -489,6 +495,25 @@ class TTAnalysis:
 
 class Debug:
     name="debug"
+    pdb=False
+
+    def post_expansion_debug(self):
+        def find_path(path_so_far):
+            here_hash = path_so_far[-1]
+            if self.game.game_winner(self.known_states[here_hash]) is not None:
+                return path_so_far
+            else:
+                best_value, _actions = self.opinion[here_hash]
+                successors = [h for h, a in self.children[here_hash]
+                              if self.value[h] == best_value]
+                paths = [find_path(path_so_far + [s])
+                         for s in successors if s not in path_so_far]
+                return paths
+        current_hash = self.game.hash_state(self.current_state)
+        win_paths = find_path([current_hash])
+
+        if self.pdb:
+            import pdb; pdb.set_trace()
 
 
 ### Evaluation function boilerplate
