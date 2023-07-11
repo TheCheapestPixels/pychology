@@ -234,9 +234,12 @@ def assemble_search(spec_str):
         else:
             raise Exception("Storage lacks corresponding analysis capability.")
 
-    if properties.get('name', False):
+    if any(n in properties for n in ['name', 'pdb']):
         bases.append(Debug)
-        attribs['name'] = properties['name']
+        if 'name' in properties:
+            attribs['name'] = properties['name']
+        if 'pdb' in properties:
+            attribs['pdb'] = True
 
     bases.append(Search)
 
