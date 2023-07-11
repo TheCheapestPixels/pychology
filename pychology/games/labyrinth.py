@@ -67,7 +67,27 @@ I.
                                                                                                    O"""[1:]
 
 
-level = level_3
+level_4 = """
+   .....
+   .   .
+...I...O
+   .   .
+   .....
+        
+"""
+
+
+level_5 = """
+....
+.  .
+I. O
+ . .
+ ...
+    
+"""
+
+
+level = level_5
 
 
 PLAYER = 1
@@ -193,7 +213,9 @@ def visualize_state(state):
                     line_repr.append(' ')
             else:
                 line_repr.append('#')
+        line_repr.append('#')  # Closing wall at right edge
         board_repr.append(''.join(line_repr))
+    board_repr.append('#' * (columns + 1))
     print('\n'.join(board_repr))
     print(f"Moves made: {len(moves_made)}")
     if game_winner(state):
