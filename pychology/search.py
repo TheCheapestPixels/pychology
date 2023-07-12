@@ -467,6 +467,28 @@ class BestMovePlayer:
         return random.choice(actions)
 
 
+class BestPaths:
+    def select_action(self):
+        def find_path(path_so_far):
+            here_hash = path_so_far[-1]
+            if self.game.game_winner(self.known_states[here_hash]) is not None:
+                return [[here_hash]]
+            else:
+                best_value, _actions = self.opinion[here_hash]
+                successors = [h for h, a in self.children[here_hash]
+                              if self.value[h] == best_value
+                              if h not in path_so_far]
+                paths = []
+                for successor in successors:
+                    rest_paths = find_path(path_so_far + [successor])
+                    for rest_path in rest_paths:
+                        paths.append([here_hash] + rest_path)
+                return paths
+        current_hash = self.game.hash_state(self.current_state)
+        win_paths = find_path([current_hash])
+        return win_paths
+
+
 ### Analysis and debug
 
 class TTAnalysis:
@@ -498,20 +520,6 @@ class Debug:
     pdb=False
 
     def post_expansion_debug(self):
-        def find_path(path_so_far):
-            here_hash = path_so_far[-1]
-            if self.game.game_winner(self.known_states[here_hash]) is not None:
-                return path_so_far
-            else:
-                best_value, _actions = self.opinion[here_hash]
-                successors = [h for h, a in self.children[here_hash]
-                              if self.value[h] == best_value]
-                paths = [find_path(path_so_far + [s])
-                         for s in successors if s not in path_so_far]
-                return paths
-        current_hash = self.game.hash_state(self.current_state)
-        win_paths = find_path([current_hash])
-
         if self.pdb:
             import pdb; pdb.set_trace()
 
