@@ -9,6 +9,7 @@ from pychology.search import NodeLimitedExpansion
 from pychology.search import StepLimitedExpansion
 from pychology.search import SingleNodeBreadthSearch
 from pychology.search import BreadthSearch
+from pychology.search import PriorityExpansionQueue
 from pychology.search import AllCombinations
 from pychology.search import Portfolio
 from pychology.search import ZeroSumPlayer
@@ -194,6 +195,9 @@ def assemble_search(spec_str):
         bases.append(SingleNodeBreadthSearch)
         if 'limit' in properties:
             attribs['node_limit'] = int(properties['limit'])
+    elif limit_type == 'priority':
+        bases.append(FullExpansion)
+        bases.append(PriorityExpansionQueue)
     else:
         raise Exception(f"Unknown limit type '{limit_type}'.")
 

@@ -1,78 +1,26 @@
-# **Basic tree search**: You have a current world state as the root of
-# the state tree. You can choose a state the tree to expand, generating
-# a set of successor nodes. You have an evaluation function that says
-# how desirable a given state is to you. After expansion and evaluation
-# of the new successors, a minimax recalculates the value of each node
-# by taking the minimum or maximum of the child nodes (propagating from
-# leaves to root), based on which player is acting during that node's
-# move. Thus whenever the search is stopped, the best currently known
-# action is the one leading to the child node with the highest value.
-#
-# **Better tree representation**
-# DAG: Given a game state, there are often different action sequences
-# leading to the same successor game state. In a tree, these are treated
-# as two different objects, and expanded separately from each other,
-# multiplying the time and space spent on that state.
-# Similar states: Different game states can be similar enough to each
-# other to be considered the same for game purposes; Board states may be
-# mappable to each other. In Tic Tac Toe, for example, if two game
-# states can be turned into each other through rotation and mirroring,
-# they can be treated as the same state for rules purposes. Employing
-# a state hash function that generates a transformation-independent
-# hash will cut down on the state tree size; 
-# 
-# **Choosing the node to expand**
-# Depth-first: Simulates one possible game session from beginning to
-# end, then considers other possible final moves, and so on. This only
-# works if the state space is small, like for Tic-Tac-Toe.
-# Breadth-first: Expand all nodes on a given depth level of a tree
-# before expanding any deeper ones. Simple, but actually works.
-# A*: Nodes to expand are sorted by their estimated distance to a goal
-# state. This estimation has to be optimistic, otherwise it is not
-# guaranteed that the ideal path will be found.
 # Alpha-Beta Pruning: Resources for deeper search can be freed up by not
 # expanding nodes of apparent bad moves. For optimal performance,
 # expanded nodes have to be sorted
+#
 # Quiescense search: Unstable states are ones that bear a greater risk
 # than others as defined under some stability criterion, e.g. "Is the
 # chess player's queen under threat?". These can be expanded before more
 # stable ones, focusing search resources so that players don't leave
 # themselves open for stupid mistakes because more stable parts of the
 # tree were expanded first.
-#
-# **Choosing which actions to expand the node with**
-# Hierarchical Portfolio Search: Designers build sets of behaviors,
-# which are function that, given a state, produce actions. They then
-# build portfolios, which are functions that, given a game state,
-# produce combinations of behaviors. During expansion, these portfolios
-# choose the actions to expand a node with. Thus, the branching factor
-# is cut down, and designers can build desired behaviors.
 # 
-# **Evaluating states**
-# Explicit function: For a given game, bespoke functions can be written
-# to encapsulate the developer's knowledge about a game.
-# Monte Carlo Tree Search: Starting at the state, the rest of the game
-# is played out to its end by using random actions, and the end state's
-# value is used for propagation. Simulating these play-outs multiple
-# times leads to more accurate values. This approach does not require
-# a-priori knowledge about how to play a game well, only to know its
-# rules.
-# 
-# **Higher-level techniques**
 # Bi-directional path search: If a desired goal state can be defined,
 # and possible antecedent states for a given state can be derived, then
 # expansion can happen from the goal backwards as well as from the
 # current states forwards, and a path between them found more quickly
 # than by searching only forwards. This optimizes GOAP.
-# Machine Learning: Apply it to choosing the expansion and evaluation
-# functions, train it on Monte Carlo Tree Search, and you basically have
-# AlphaGo.
 
 
 import random
 import itertools
 from collections import defaultdict
 import math
+import queue
 
 
 class Search:
@@ -132,6 +80,12 @@ class Search:
                     successor_hash = self.game.hash_state(successor)
                     # FIXME: Hashes may only be used in extensions.
                     self.value[successor_hash] = self.evaluate_state(successor)
+                    # Is the node terminal?
+                    # FIXME: This should be encapsulated in TT.
+                    terminal_value = self.game.game_winner(successor)
+                    if terminal_value is not None:
+                        self.terminal_states[successor_hash] = terminal_value
+
                     self.enqueue_for_expansion(successor)
             self.backpropagate(state)
         return True  # Keep running
@@ -252,6 +206,24 @@ class StepLimitedExpansion:
             self.step()
 
 
+class PriorityLimitedExpansion:
+    def build_tree(self):
+        active = True
+        best_terminal_value = -math.inf
+        known_terminal_states = set()
+        while self.step():
+            current_terminal_states = set(self.terminal_states.keys())
+            new_terminal_states = current_terminal_states - known_terminal_states
+            for terminal_state in new_terminal_states:
+                value = self.value[terminal_state]
+                if value > best_terminal_value:
+                    best_terminal_value = value  # Better path found
+                else:
+                    active = False  # Search is done.
+            if not active:
+                break
+
+
 # State selection
 
 class NoExpansionQueue:
@@ -305,6 +277,26 @@ class BreadthSearch(BasicExpansionQueue):
         except IndexError:
             return []
         return states
+
+
+class PriorityExpansionQueue:
+    prioritization_func = 'default'
+    def setup_expansion(self):
+        self.expansion_queue = queue.PriorityQueue()
+
+    def enqueue_for_expansion(self, state):
+        p_func_name = self.prioritization_function
+        p_func = self.game.prioritization_funcs[p_func_name]
+        self.expansion_queue.put(
+            (p_func(state), state)
+        )
+
+    def select_states_to_expand(self):
+        try:
+            priority, state = self.expansion_queue.get(block=False)
+        except queue.Empty:
+            return []
+        return [state]
 
 
 # Action expansion
@@ -474,10 +466,13 @@ class BestPaths:
             if self.game.game_winner(self.known_states[here_hash]) is not None:
                 return [[here_hash]]
             else:
-                best_value, _actions = self.opinion[here_hash]
-                successors = [h for h, a in self.children[here_hash]
-                              if self.value[h] == best_value
-                              if h not in path_so_far]
+                if here_hash in self.opinion:
+                    best_value, _actions = self.opinion[here_hash]
+                    successors = [h for h, a in self.children[here_hash]
+                                  if self.value[h] == best_value
+                                  if h not in path_so_far]
+                else:
+                    successors = []
                 paths = []
                 for successor in successors:
                     rest_paths = find_path(path_so_far + [successor])
