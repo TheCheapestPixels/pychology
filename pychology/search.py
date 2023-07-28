@@ -209,12 +209,12 @@ class StepLimitedExpansion:
 class PriorityLimitedExpansion:
     def build_tree(self):
         active = True
-        best_terminal_value = -math.inf
+        best_terminal_value = math.inf
         known_terminal_states = set()
         while self.step():
             priority, state = self.expansion_queue.get(block=False)
             self.expansion_queue.put((priority, state))
-            if priority < best_terminal_value:
+            if priority > best_terminal_value:
                 break  # Best state in queue is worse than a known one.
 
             # Update known terminal values
@@ -222,7 +222,7 @@ class PriorityLimitedExpansion:
             new_terminal_states = current_terminal_states - known_terminal_states
             for terminal_state in new_terminal_states:
                 value = self.value[terminal_state]
-                if value > best_terminal_value:
+                if value < best_terminal_value:
                     best_terminal_value = value  # Better path found
 
 
@@ -289,13 +289,16 @@ class PriorityExpansionQueue:
     def enqueue_for_expansion(self, state):
         p_func_name = self.prioritization_function
         p_func = self.game.prioritization_funcs[p_func_name]
+        priority = p_func(state)
+        #print(f"Enqueue: {state} @ {priority}")
         self.expansion_queue.put(
-            (p_func(state), state)
+            (priority, state)
         )
 
     def select_states_to_expand(self):
         try:
             priority, state = self.expansion_queue.get(block=False)
+            #print(f"Expand : {state} @ {priority}")
         except queue.Empty:
             return []
         return [state]

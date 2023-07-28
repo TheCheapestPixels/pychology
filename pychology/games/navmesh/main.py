@@ -187,17 +187,18 @@ def path_value(state, nav_graph, to_id):
     # FIXME: This is how it works with py>=3.10
     # costs = [nav_graph['cost'][a][b]
     #          for a, b in itertools.pairwise(state)]
-    costs = []
+    cost = 0.0
     for idx in range(len(state) - 1):
         a = state[idx]
         b = state[idx + 1]
-        costs.append(nav_graph['cost'][a][b])
+        cost += nav_graph['cost'][a][b]
 
     # Euclidean heuristic cost
     current_pos = nav_graph['pos'][state[-1]]
     target_pos = nav_graph['pos'][to_id]
     dist = (target_pos - current_pos).length()
-    return -(sum(costs) + dist)
+
+    return -(cost + dist)
 
 
 def make_state_value(p, nav_graph, to_id):
@@ -208,7 +209,7 @@ def make_state_value(p, nav_graph, to_id):
 
 def make_state_priority(nav_graph, to_id):
     def state_priority(state):
-        return path_value(state, nav_graph, to_id)
+        return -path_value(state, nav_graph, to_id)
     return state_priority
 
 
