@@ -212,16 +212,18 @@ class PriorityLimitedExpansion:
         best_terminal_value = -math.inf
         known_terminal_states = set()
         while self.step():
+            priority, state = self.expansion_queue.get(block=False)
+            self.expansion_queue.put((priority, state))
+            if priority < best_terminal_value:
+                break  # Best state in queue is worse than a known one.
+
+            # Update known terminal values
             current_terminal_states = set(self.terminal_states.keys())
             new_terminal_states = current_terminal_states - known_terminal_states
             for terminal_state in new_terminal_states:
                 value = self.value[terminal_state]
                 if value > best_terminal_value:
                     best_terminal_value = value  # Better path found
-                else:
-                    active = False  # Search is done.
-            if not active:
-                break
 
 
 # State selection
@@ -461,27 +463,29 @@ class BestMovePlayer:
 
 class BestPaths:
     def select_action(self):
-        def find_path(path_so_far):
-            here_hash = path_so_far[-1]
-            if self.game.game_winner(self.known_states[here_hash]) is not None:
-                return [[here_hash]]
-            else:
-                if here_hash in self.opinion:
-                    best_value, _actions = self.opinion[here_hash]
-                    successors = [h for h, a in self.children[here_hash]
-                                  if self.value[h] == best_value
-                                  if h not in path_so_far]
-                else:
-                    successors = []
-                paths = []
-                for successor in successors:
-                    rest_paths = find_path(path_so_far + [successor])
-                    for rest_path in rest_paths:
-                        paths.append([here_hash] + rest_path)
-                return paths
-        current_hash = self.game.hash_state(self.current_state)
-        win_paths = find_path([current_hash])
-        return win_paths
+        return [list(p) for p in self.terminal_states.keys()]
+        #import pdb; pdb.set_trace()
+        #def find_path(path_so_far):
+        #    here_hash = path_so_far[-1]
+        #    if self.game.game_winner(self.known_states[here_hash]) is not None:
+        #        return [[here_hash]]
+        #    else:
+        #        if here_hash in self.children:
+        #            best_value, _actions = self.children[here_hash]
+        #            successors = [h for h, a in self.children[here_hash]
+        #                          if self.value[h] == best_value
+        #                          if h not in path_so_far]
+        #        else:
+        #            successors = []
+        #        paths = []
+        #        for successor in successors:
+        #            rest_paths = find_path(path_so_far + [successor])
+        #            for rest_path in rest_paths:
+        #                paths.append([here_hash] + rest_path)
+        #        return paths
+        #current_hash = self.game.hash_state(self.current_state)
+        #win_paths = find_path([current_hash])
+        #return win_paths
 
 
 ### Analysis and debug
