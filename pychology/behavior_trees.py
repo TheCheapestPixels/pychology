@@ -437,7 +437,6 @@ class Priorities(Multinode):
                 if idx != self.active_child and self.active_child is not None:
                     previous_child = self.children[self.active_child]
                     previous_child.reset()
-                    print("Reset previous choice")
                 self.active_child = idx
                 return rv
         if self.active_child is not None:
