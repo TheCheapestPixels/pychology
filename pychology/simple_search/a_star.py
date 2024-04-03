@@ -7,7 +7,7 @@ def search(adjacency_matrix, estimation_func, start, goal):
     frontier.put((0, 0, start, None))  # Total cost, fixed cost, node
     try:
         while True:
-            total_cost, fixed_cost, node, from_node = frontier.get()
+            total_cost, fixed_cost, node, from_node = frontier.get(block=False)
             if node not in explored or explored[node][0] > fixed_cost:
                 explored[node] = (fixed_cost, from_node)
             if node == goal:  # Search succeeded
