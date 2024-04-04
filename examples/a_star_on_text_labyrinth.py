@@ -1,5 +1,7 @@
 import math
 
+from pychology.simple_search.a_star import search
+from pychology.simple_search.a_star import get_neighbors_and_costs
 
 level_1 = "I...O"
 
@@ -133,10 +135,10 @@ def print_labyrinth(level, path=None):
     print(''.join(annotated_level))
     
 
-level = level_5
+level = level_2
 adj_mat, start, goal = create_adjacency_from_string(level)
 print(start, goal)
 print_labyrinth(level)
-cost, path = search(adj_mat, euclidean_distance, start, goal)
+cost, path = search(get_neighbors_and_costs(adj_mat), euclidean_distance, start, goal)
 print(cost)
 print_labyrinth(level, path)

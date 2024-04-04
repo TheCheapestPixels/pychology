@@ -10,7 +10,8 @@ from panda3d.core import CollisionHandlerQueue
 
 from direct.showbase.ShowBase import ShowBase
 
-from a_star import search
+from pychology.simple_search.a_star import search
+from pychology.simple_search.a_star import get_neighbors_and_costs
 
 from navgraph import make_nav_graph
 from navgraph import make_transition_grid
@@ -90,7 +91,7 @@ if __name__ == '__main__':
             pos_b = nav_graph['pos'][node_b]
             return (pos_a - pos_b).length()
 
-        cost, path = search(adjacency_matrix, estimator, from_id, to_id)
+        cost, path = search(get_neighbors_and_costs(adjacency_matrix), estimator, from_id, to_id)
         print(path)
 
         # Visualize path
