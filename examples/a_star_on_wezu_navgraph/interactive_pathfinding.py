@@ -91,7 +91,7 @@ if __name__ == '__main__':
             pos_b = nav_graph['pos'][node_b]
             return (pos_a - pos_b).length()
 
-        cost, path = search(get_neighbors_and_costs(adjacency_matrix), estimator, from_id, to_id)
+        cost, path = search(get_neighbors_and_costs(adjacency_matrix), from_id, to_id, estimator)
         print(path)
 
         # Visualize path

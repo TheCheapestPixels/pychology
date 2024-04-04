@@ -139,6 +139,6 @@ level = level_2
 adj_mat, start, goal = create_adjacency_from_string(level)
 print(start, goal)
 print_labyrinth(level)
-cost, path = search(get_neighbors_and_costs(adj_mat), euclidean_distance, start, goal)
+cost, path = search(get_neighbors_and_costs(adj_mat), start, goal, euclidean_distance)
 print(cost)
 print_labyrinth(level, path)
