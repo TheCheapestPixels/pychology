@@ -487,7 +487,7 @@ class Action(Node):
 
         Action(walk_straight)
     """
-    def __init__(self, func):
+    def __init__(self, func, pass_entity=True):
         """
         func:
             The atomic behavior; A function that takes the acting entity
@@ -495,9 +495,13 @@ class Action(Node):
             that have been passed to the BehaviorTree.
         """
         self.func = func
+        self.pass_entity = pass_entity
         
     def __call__(self, entity, *args, **kwargs):
-        return self.func(entity, *args, **kwargs)
+        if self.pass_entity:
+            return self.func(entity, *args, **kwargs)
+        else:
+            return self.func(*args, **kwargs)
 
     def reset(self):
         pass
