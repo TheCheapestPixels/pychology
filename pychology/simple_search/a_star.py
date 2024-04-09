@@ -12,14 +12,17 @@ def estimate_zero(node_a, node_b):
 
 
 def search(transition_func, start, goal, cost_heuristic=estimate_zero):
-    frontier = queue.PriorityQueue()
-    explored = {}
+    frontier = queue.PriorityQueue()  # (total_cost, fixed_cost, node, from_node)
+    explored = {}  # node: (fixed_cost, from_node)
     frontier.put((0, 0, start, None))  # Total cost, fixed cost, node
     try:
         while True:
             total_cost, fixed_cost, node, from_node = frontier.get(block=False)
-            if node not in explored or explored[node][0] > fixed_cost:
-                explored[node] = (fixed_cost, from_node)
+            if node in explored:
+                if explored[node][0] > fixed_cost:
+                    explored[node] = (fixed_cost, from_node)
+                continue
+            explored[node] = (fixed_cost, from_node)
             if node == goal:  # Search succeeded
                 path = [node]
                 while True:
@@ -36,6 +39,5 @@ def search(transition_func, start, goal, cost_heuristic=estimate_zero):
                 next_fixed_cost = fixed_cost + transition_cost
                 next_total_cost = next_fixed_cost + cost_heuristic(next_node, goal)
                 frontier.put((next_total_cost, next_fixed_cost, next_node, node))
-                #import pdb; pdb.set_trace()
     except queue.Empty:
         raise Exception("no path found")  # FIXME: Make this exception
