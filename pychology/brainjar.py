@@ -22,6 +22,9 @@ class BBField(enum.Enum):
     BEHAVIORS      = 1  # dict of name -> function
     COMMAND        = 2  # Command given to the AI; (AICommand._, *args)
     PLAN           = 3  # The AI's command for action
+    IDLE_BEHAVIOR  = 4  # FIXME: This needs to go somehow.
+    SENSOR         = 5
+    SENSATIONS     = 6
 
 
 # BBField.COMMAND is a list of a command and the arguments for it.
@@ -47,6 +50,11 @@ def bb_has_not(field):
 
 # Actions
 
+def perceive(ai):
+    sensor_func = ai.blackboard[BBField.SENSOR]
+    ai.blackboard[BBField.SENSATIONS] = sensor_func()
+
+
 def set_plan_to_command(ai):
     command, arg = ai.blackboard[BBField.COMMAND]
     if command == AICommand.BEHAVIOR:
@@ -55,6 +63,18 @@ def set_plan_to_command(ai):
     return NodeState.DONE
 
 
+# FIXME: This should be bb_has_not((BBField.BEHAVIORS, BBField.IDLE_BEHAVIOR))
+def has_no_idle_behavior(ai):
+    return not BBField.IDLE_BEHAVIOR in ai.blackboard[BBField.BEHAVIORS]
+
+
+def set_idle_behavior(ai):
+    behavior = ai.blackboard[BBField.BEHAVIORS][BBField.IDLE_BEHAVIOR]
+    ai.blackboard[BBField.PLAN] = behavior
+    return NodeState.DONE
+
+
+# FIXME: This looks like an `Action`?
 def execute_plan(ai):
     return ai.blackboard[BBField.PLAN](ai)
 
@@ -73,21 +93,30 @@ def bb_del(field):
 
 def BT_think():
     return BehaviorTree(
-        Chain(                                            # Run through these steps:
-            # Action(perceive),                           # Draw data into the blackboard.
-            DoneOnPrecondition(                           # We skip this block
-                bb_has_not(BBField.COMMAND),              # if no direct command is present,
-                Chain(                                    # otherwise
-                    Action(set_plan_to_command),          # we set the plan to it,
-                    Action(bb_del(BBField.COMMAND)),      # and clear the command field,
+        Chain(                                              # Run through these steps:
+            DoneOnPrecondition(                             # Perception: We skip this block if
+                bb_has_not(BBField.SENSOR),                 # no sensor function is present,
+                Action(perceive),                           # otherwise we perceive.
+            ),
+            DoneOnPrecondition(                             # Command compulsion: We skip this block if
+                bb_has_not(BBField.COMMAND),                # no direct command is present,
+                Chain(                                      # otherwise
+                    Action(set_plan_to_command),            # we set the plan to it,
+                    Action(bb_del(BBField.COMMAND)),        # and clear the command field,
                 ),
-            ),                                            # otherwise
-            # Action(cogitate),                           # think for yourself.
-            DoneOnPrecondition(                           # If
-                bb_has_not(BBField.PLAN),                 # we have a plan,
+            ),
+            DoneOnPrecondition(                             # Falling back on idle behavior: We skip this block if
+                bb_has(BBField.PLAN),                       # no plan is present,
+                DoneOnPrecondition(                         # also if
+                    has_no_idle_behavior,                   # we don't know of an idle behavior,
+                    Action(set_idle_behavior),              # otherwise we set the idle behavior as the plan.
+                ),
+            ),
+            DoneOnPrecondition(                             # If
+                bb_has_not(BBField.PLAN),                   # we have a plan,
                 Chain(
-                    Action(execute_plan),                 # act on it,
-                    Action(bb_del(BBField.PLAN)),         # then and remove it.
+                    Action(execute_plan),                   # act on it,
+                    Action(bb_del(BBField.PLAN)),           # then and remove it.
                 ),
             ),
         ),
