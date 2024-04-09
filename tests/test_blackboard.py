@@ -5,21 +5,23 @@ from pychology.blackboard import Blackboard
 
 def test_basic():
     bb = Blackboard()
-    assert 'foo' not in bb
-    bb['foo'] = 23
-    assert 'foo' in bb
-    v = bb['foo']
+    key = ('foo', )
+    assert key not in bb
+    bb[key] = 23
+    assert key in bb
+    v = bb[key]
     assert v == 23
-    del bb['foo']
-    assert 'foo' not in bb
+    del bb[key]
+    assert key not in bb
 
 
 def test_with_parent():
     bb_parent = Blackboard()
     bb_child = Blackboard(parent=bb_parent)
+    key = ('foo', )
 
-    bb_parent['foo'] = 23
-    assert 'foo' in bb_child
-    assert bb_child['foo'] == 23
+    bb_parent[key] = 23
+    assert key in bb_child
+    assert bb_child[key] == 23
     with pytest.raises(KeyError):
-        del bb_child['foo']
+        del bb_child[key]
