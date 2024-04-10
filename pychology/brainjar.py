@@ -12,6 +12,7 @@ from pychology.behavior_trees import (
     FailOnPrecondition,
     DoneOnPrecondition,
     Action,
+    ReturnActive,
     DebugPrint,  # TODO: Remove
 )
 
@@ -19,12 +20,13 @@ from pychology.behavior_trees import (
 # Blackboard fields
 class BBField(enum.Enum):
     # Behaviors
-    BEHAVIORS      = 1  # dict of name -> function
-    COMMAND        = 2  # Command given to the AI; (AICommand._, *args)
-    PLAN           = 3  # The AI's command for action
-    IDLE_BEHAVIOR  = 4  # FIXME: This needs to go somehow.
-    SENSOR         = 5
-    SENSATIONS     = 6
+    THOUGHT_PATTERN = 1
+    BEHAVIORS       = 2  # dict of name -> function
+    COMMAND         = 3  # Command given to the AI; (AICommand._, *args)
+    PLAN            = 4  # The AI's command for action
+    IDLE_BEHAVIOR   = 5  # FIXME: This needs to go somehow.
+    SENSOR          = 6
+    SENSATIONS      = 7
 
 
 # BBField.COMMAND is a list of a command and the arguments for it.
@@ -91,6 +93,12 @@ def bb_del(field):
 
 # Factory functions for behavior trees
 
+def BT_dont_think():
+    return BehaviorTree(
+        ReturnActive(),
+    )
+
+
 def BT_think():
     return BehaviorTree(
         Chain(                                              # Run through these steps:
@@ -125,29 +133,45 @@ def BT_think():
 
 class BrainJar:
     def __init__(self, parent_ai=None, thought_pattern=None, on_idle=None):
-        self.blackboard = Blackboard(parent=parent_ai)
-        self.blackboard[BBField.BEHAVIORS] = {}
-        if thought_pattern is not None:
-            self.thought_pattern = thought_pattern
+        if parent_ai is not None:
+            bb_parent = parent_ai.blackboard
         else:
-            self.thought_pattern = BT_think()
-        self.on_idle = on_idle
+            bb_parent = None
+        self.blackboard = Blackboard(parent=bb_parent)
+        self.blackboard[BBField.BEHAVIORS] = {}
+
+        if thought_pattern is not None:
+            self.set_thought_pattern(thought_pattern)
+        else:
+            self.set_thought_pattern(BT_think)
+        if on_idle is not None:
+            self.set_idle_behavior(on_idle)
+
+    def __repr__(self):
+        return repr(self.blackboard.values)
 
     def think(self):
-        rv = self.thought_pattern(self)
-        if rv == NodeState.DONE and self.on_idle is not None:
-            self.on_idle(self)
+        rv = self.blackboard[BBField.THOUGHT_PATTERN](self)
+        if rv == NodeState.DONE:
+            self.blackboard[BBField.BEHAVIORS][BBField.IDLE_BEHAVIOR](self)
 
     def add_knowledge(self, name, fact):
         self.blackboard[name] = fact
 
     def add_behavior(self, name, behavior):
-        self.blackboard[BBField.BEHAVIORS][name] = behavior
+        self.blackboard[BBField.BEHAVIORS][name] = behavior(self)
 
-    def command(self, behavior, **kwargs):
+    def command(self, behavior_name, **kwargs):
         behaviors = self.blackboard[BBField.BEHAVIORS]
-        if behavior not in behaviors:
-            raise KeyError(f"Unknown behavior {behavior}. Available are: {', '.join(behaviors.keys())}")
-        self.blackboard[BBField.COMMAND] = (AICommand.BEHAVIOR, behavior)
+        if behavior_name not in behaviors:
+            raise KeyError(f"Unknown behavior {behavior_name}. Available are: {', '.join(behaviors.keys())}")
+        self.blackboard[BBField.COMMAND] = (AICommand.BEHAVIOR, behavior_name)
         for name, value in kwargs.items():
             self.blackboard[name] = value
+
+    def set_idle_behavior(self, behavior):
+        self.blackboard[BBField.BEHAVIORS][BBField.IDLE_BEHAVIOR] = behavior(self)
+
+    def set_thought_pattern(self, thought_pattern):
+        # FIXME: If we're thinking right now, shit's gonna get complicated.
+        self.blackboard[BBField.THOUGHT_PATTERN] = thought_pattern()
