@@ -472,9 +472,14 @@ class Parallel(Multinode):
             child.reset()
 
 
-### Action
+### Leaves of the tree
 
-class Action(Node):
+class Leaf(Node):
+    def reset(self):
+        pass
+
+
+class Action(Leaf):
     """
     Action nodes (usually called Tasks) wrap atomic behavior. They are
     the leaves of the behavior tree and have no children.
@@ -503,5 +508,19 @@ class Action(Node):
         else:
             return self.func(*args, **kwargs)
 
-    def reset(self):
-        pass
+
+class ReturnValue(Leaf):
+    def __call__(self, entity, *args, **kwargs):
+        return self.return_value
+
+
+class ReturnActive(ReturnValue):
+    return_value = NodeState.ACTIVE
+
+
+class ReturnDone(ReturnValue):
+    return_value = NodeState.DONE
+
+
+class ReturnFailed(ReturnValue):
+    return_value = NodeState.FAILED
