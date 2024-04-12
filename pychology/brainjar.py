@@ -55,6 +55,7 @@ def bb_has_not(field):
 def perceive(ai):
     sensor_func = ai.blackboard[BBField.SENSOR]
     ai.blackboard[BBField.SENSATIONS] = sensor_func()
+    return NodeState.DONE
 
 
 def set_plan_to_command(ai):
@@ -175,3 +176,6 @@ class BrainJar:
     def set_thought_pattern(self, thought_pattern):
         # FIXME: If we're thinking right now, shit's gonna get complicated.
         self.blackboard[BBField.THOUGHT_PATTERN] = thought_pattern()
+
+    def set_sensor(self, sensor_func):
+        self.blackboard[BBField.SENSOR] = sensor_func
