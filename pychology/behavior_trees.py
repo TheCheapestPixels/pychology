@@ -504,9 +504,12 @@ class Action(Leaf):
         
     def __call__(self, entity, *args, **kwargs):
         if self.pass_entity:
-            return self.func(entity, *args, **kwargs)
+            rv = self.func(entity, *args, **kwargs)
         else:
-            return self.func(*args, **kwargs)
+            rv = self.func(*args, **kwargs)
+        if rv not in NodeState:
+            raise Exception(f"Action function must return a NodeState, but returned:\n{rv}\n")
+        return rv
 
 
 class ReturnValue(Leaf):

@@ -62,7 +62,7 @@ def set_plan_to_command(ai):
     command, arg = ai.blackboard[BBField.COMMAND]
     if command == AICommand.BEHAVIOR:
         behavior = ai.blackboard[BBField.BEHAVIORS][arg]
-        ai.blackboard[BBField.PLAN] = behavior
+        ai.set_plan(behavior)
     return NodeState.DONE
 
 
@@ -73,7 +73,7 @@ def has_no_idle_behavior(ai):
 
 def set_idle_behavior(ai):
     behavior = ai.blackboard[BBField.BEHAVIORS][BBField.IDLE_BEHAVIOR]
-    ai.blackboard[BBField.PLAN] = behavior
+    ai.set_plan(behavior)
     return NodeState.DONE
 
 
@@ -161,6 +161,10 @@ class BrainJar:
 
     def add_behavior(self, name, behavior):
         self.blackboard[BBField.BEHAVIORS][name] = behavior(self)
+
+    def set_plan(self, plan):
+        plan.reset()
+        self.blackboard[BBField.PLAN] = plan
 
     def command(self, behavior_name, **kwargs):
         behaviors = self.blackboard[BBField.BEHAVIORS]
