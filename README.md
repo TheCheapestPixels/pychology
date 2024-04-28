@@ -1,3 +1,5 @@
+![Logo: A brain in a jar together with a blackboard with scribbles on it; The jar is connected by wires to an eye and a robotic arm.](./logo.png)
+
 pychology
 =========
 
