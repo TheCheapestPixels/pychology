@@ -507,7 +507,7 @@ class Action(Leaf):
             rv = self.func(entity, *args, **kwargs)
         else:
             rv = self.func(*args, **kwargs)
-        if rv not in NodeState:
+        if rv not in [NodeState.ACTIVE, NodeState.DONE, NodeState.FAILED]:
             raise Exception(f"Action function must return a NodeState, but returned:\n{rv}\n")
         return rv
 
