@@ -1,6 +1,11 @@
 import queue
 
 
+class NoPath(Exception):
+    def __init__(self, explored):
+        self.explored = explored
+
+
 def get_neighbors_and_costs(nav_graph):
     def inner(node):
         return nav_graph[node].items()
@@ -40,4 +45,4 @@ def search(transition_func, start, goal, cost_heuristic=estimate_zero):
                 next_total_cost = next_fixed_cost + cost_heuristic(next_node, goal)
                 frontier.put((next_total_cost, next_fixed_cost, next_node, node))
     except queue.Empty:
-        raise Exception("no path found")  # FIXME: Make this exception
+        raise NoPath(list(explored.keys()))
