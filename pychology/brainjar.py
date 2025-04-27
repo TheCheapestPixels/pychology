@@ -115,7 +115,7 @@ def BT_think():
                 ),
             ),
             DoneOnPrecondition(                             # Falling back on idle behavior: We skip this block if
-                bb_has(BBField.PLAN),                       # no plan is present,
+                bb_has(BBField.PLAN),                       # a plan is present,
                 DoneOnPrecondition(                         # also if
                     has_no_idle_behavior,                   # we don't know of an idle behavior,
                     Action(set_idle_behavior),              # otherwise we set the idle behavior as the plan.
@@ -153,8 +153,9 @@ class BrainJar:
 
     def think(self):
         rv = self.blackboard[BBField.THOUGHT_PATTERN](self)
-        if rv == NodeState.DONE:
-            self.blackboard[BBField.BEHAVIORS][BBField.IDLE_BEHAVIOR](self)
+        # If the plan isn't DONE, the thought pattern didn't finish, so
+        # we need to reset the thought pattern for the next frame.
+        self.blackboard[BBField.THOUGHT_PATTERN].reset()
 
     def add_knowledge(self, name, fact):
         self.blackboard[name] = fact
