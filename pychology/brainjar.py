@@ -11,6 +11,7 @@ from pychology.behavior_trees import (
     Priorities,
     FailOnPrecondition,
     DoneOnPrecondition,
+    ReturnDoneAlways,
     Action,
     ReturnActive,
     DebugPrint,  # TODO: Remove
@@ -123,9 +124,11 @@ def BT_think():
             ),
             DoneOnPrecondition(                             # If
                 bb_has_not(BBField.PLAN),                   # we have a plan,
-                Chain(
-                    Action(execute_plan),                   # act on it,
-                    Action(bb_del(BBField.PLAN)),           # then and remove it.
+                ReturnDoneAlways(                           # running it will be DONE for each invocation when we
+                    Chain(
+                        Action(execute_plan),               # act on it,
+                        Action(bb_del(BBField.PLAN)),       # then and remove it.
+                    ),
                 ),
             ),
         ),
@@ -153,9 +156,6 @@ class BrainJar:
 
     def think(self):
         rv = self.blackboard[BBField.THOUGHT_PATTERN](self)
-        # If the plan isn't DONE, the thought pattern didn't finish, so
-        # we need to reset the thought pattern for the next frame.
-        self.blackboard[BBField.THOUGHT_PATTERN].reset()
 
     def add_knowledge(self, name, fact):
         self.blackboard[name] = fact
