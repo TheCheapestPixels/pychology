@@ -65,8 +65,8 @@ def test_option():
         'plan',
         TuningConsideration(),
     )
-    plan, rank, weight = option(None)
-    assert plan == 'plan'
+    option, rank, weight = option(None)
+    assert option.plan == 'plan'
     assert rank == 0
     assert weight == 1.0
 

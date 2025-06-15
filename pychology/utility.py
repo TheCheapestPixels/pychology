@@ -8,26 +8,40 @@ def prod(seq):
 
 
 class Reasoner:
-    def __init__(self, *options):
+    def __init__(self, *options, name=None):
         self.options = options
+        self.name = name
 
     def __call__(self, environment):
+        option = self.select_option(environment)
+        return option.plan
+
+    def select_option(self, environment):
         valuations = [option(environment) for option in self.options]
         # Remove options with weight of 0.0
         valuations = [v for v in valuations if v[2] > 0.0]
         # Remove options with non-maximal rank
         max_rank = max(v[1] for v in valuations)
         valuations = [v for v in valuations if v[1] == max_rank]
-        return random.choices(
+        # Select option
+        selected = random.choices(
             [v[0] for v in valuations],
             weights=[v[2] for v in valuations],
         )[0]
+        # Done!
+        return selected
+        
+    def __repr__(self):
+        if self.name is not None:
+            return self.name
+        return self
 
 
 class Option:
-    def __init__(self, plan, *considerations):
+    def __init__(self, plan, *considerations, name=None):
         self.plan = plan
         self.considerations = considerations
+        self.name = name
 
     def __call__(self, environment):
         valuations = [cons(environment) for cons in self.considerations]
@@ -35,15 +49,26 @@ class Option:
         boni = sum(b for _, b, _ in valuations)
         multiplier = prod(m for _, _, m in valuations)
         weight = boni * multiplier
-        return (self.plan, highest_rank, weight)
+        return (self, highest_rank, weight)
+
+    def __repr__(self):
+        if self.name is not None:
+            return self.name
+        return self
 
 
 class Consideration:
-    def __init__(self, utility_func):
+    def __init__(self, utility_func, name=None):
         self.func = utility_func
+        self.name = name
 
     def __call__(self, environment):
         return self.func(environment)
+
+    def __repr__(self):
+        if self.name is not None:
+            return self.name
+        return self
 
 
 class TuningConsideration:
