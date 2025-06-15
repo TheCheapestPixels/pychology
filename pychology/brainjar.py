@@ -51,6 +51,18 @@ def bb_has_not(field):
     return inner_bb_has_not
 
 
+def bb_field(field):
+    def inner_bb_field(ai):
+        return ai.blackboard[field]
+    return inner_bb_field
+
+
+def bb_field_not(field):
+    def inner_bb_field_not(ai):
+        return not ai.blackboard[field]
+    return inner_bb_field_not
+
+
 # Actions
 
 def perceive(ai):
@@ -91,6 +103,13 @@ def bb_del(field):
         except KeyError:
             return NodeState.FAILED
     return inner
+
+
+def bb_copy(from_field, to_field):
+    def inner_bb_copy(ai):
+        ai.blackboard[to_field] = ai.blackboard[from_field]
+        return NodeState.DONE
+    return inner_bb_copy
 
 
 # Factory functions for behavior trees
