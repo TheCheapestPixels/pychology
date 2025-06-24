@@ -72,14 +72,32 @@ def test_arity_error_on_rules():
 def test_query_errors():
     kb = KnowledgeBase()
     with pytest.raises(RelationError) as e:
-        kb.query('foo', V('x'))
+        next(kb.query('foo', V('x')))
         assert e.relation == 'foo'
     kb.fact('foo', 'something')
     with pytest.raises(ArityError) as e:
-        kb.query('foo', V('x'), V('y'))
+        next(kb.query('foo', V('x'), V('y')))
         assert e.relation == 'foo'
         assert e.arity == 1
         assert e.num_args != 1
+
+
+def test_fact_queries():
+    kb = KnowledgeBase()
+    kb.fact('unary', 'foo')
+    kb.fact('unary', 'bar')
+    kb.fact('unary', 'baz')
+    results = list(kb.query('unary', V('X')))
+    assert len(results) == 3
+    found_substitutions = []
+    for result in results:
+        assert isinstance(result, dict)
+        assert len(result) == 1
+        assert kb.variables['X'] in result
+        found_substitutions.append(result[kb.variables['X']])
+    assert kb.values['foo'] in found_substitutions
+    assert kb.values['bar'] in found_substitutions
+    assert kb.values['baz'] in found_substitutions
 
 
 def test_complex():

@@ -133,8 +133,23 @@ class KnowledgeBase:
             raise RelationError(relation)
         self._check_arity(relation, arguments)
         arguments = self._internalize(arguments)
-        import pdb; pdb.set_trace()
-        pass  # FIXME
+        # Match against facts
+        facts = self.facts[relation]
+        for fact in facts:
+            unifications = {arg: None for arg in arguments if isinstance(arg, Variable)}  # Variable: Value or None
+            for arg_query, arg_fact in zip(arguments, fact):  # All arg_facts are Values, BTW, that's what makes it a fact.
+                if not isinstance(arg_query, Variable):  # query arg is a value; Does it match?
+                    if arg_query is not arg_fact:  # If not, next fact.
+                        break
+                else:  # query arg *is* a Variable. Is it un-unified?
+                    if unifications[arg_query] is None:  # Yes, so unify it.
+                        unifications[arg_query] = arg_fact
+                    else:  # No, it is unified already, so if it doesn't match, next fact.
+                        if unifications[arg_query] is not arg_fact:
+                            break
+            # We matched/unified all arguments, so we have a result.
+            else:
+                yield unifications
 
     def __repr__(self):
         
