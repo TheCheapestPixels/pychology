@@ -305,7 +305,7 @@ class KnowledgeBase:
                 for final_unification in final_unifications:
                     yield final_unification
 
-    def query(self, atom_or_relation, *arguments):
+    def query(self, atom_or_relation, *arguments, ext_symbols=True):
         if isinstance(atom_or_relation, Atom):
             query = atom_or_relation
             # FIXME: A better exception, please
@@ -315,7 +315,10 @@ class KnowledgeBase:
             query = Atom(sv, atom_or_relation, arguments)
         relation = query.relation
         for unification in self._unify_atom_and_all_facts(query):
-            yield unification
+            if ext_symbols:
+                yield {variable.symbol: value.symbol for variable, value in unification.items()}
+            else:
+                yield unification
 
     def rule(self, *atoms):
         sv = SymbolView(self)
@@ -347,36 +350,6 @@ class KnowledgeBase:
                         if self._assert_fact(fact):
                             sv.commit()
                             new_facts = True
-
-    # def _query_body(self, atoms, substitutions):
-    #     """
-    #     Given a list of atoms, and a dictionary of substitutions, find
-    #     all matches for the first atom. If there are further atoms left,
-    #     recurse; If not, yield the accumulated substitutions, as they
-    #     (should) represent a match for the whole list of atoms.
-    #     """
-    #     current_atom = atoms[0]
-    #     rest_atoms = atoms[1:]
-    #     # Build the subquery
-    #     sq_rel = current_atom.relation
-    #     sq_args = []
-    #     for arg in current_atom.arguments:
-    #         if arg in substitutions:
-    #             sq_args.append(substitutions[arg])
-    #         else:
-    #             sq_args.append(arg)
-    #     sv = SymbolView(self)
-    #     subquery = Atom(sv, sq_rel, sq_args)
-    #     # Find matches and recurse (or not)
-    #     matches = self.query(subquery)
-    #     if rest_atoms:  # Recurse
-    #         for match in matches:
-    #             subsubstitutions = substitutions.copy()
-    #             subsubstitutions.update(match)
-    #             self._query_body(rest_atoms, subsubstitutions)
-    #     else:  # No more atoms left
-    #         for match in matches:
-    #             yield match
 
     def __repr__(self):
         fact_strs = []

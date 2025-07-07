@@ -42,7 +42,7 @@ def test_kb_rejects_duplicate_facts():
 def test_query_fact():
     kb = KnowledgeBase()
     kb.fact('rel', 'arg1', 'arg2')
-    matches = list(kb.query('rel', '?X', '?Y'))
+    matches = list(kb.query('rel', '?X', '?Y', ext_symbols=False))
 
     # Did we pollute the KB's namespace?
     assert '?X' not in kb.variables
@@ -60,9 +60,16 @@ def test_query_fact():
             assert value.symbol == 'arg2'
 
 
+def test_query_fact_wit_external_symbols():
+    kb = KnowledgeBase()
+    kb.fact('rel', 'arg1', 'arg2')
+    matches = list(kb.query('rel', '?X', '?Y'))
+    assert matches == [{'?X': 'arg1', '?Y': 'arg2'}]
+
+
 def test_query_facts_of_nonexistent_relation():
     kb = KnowledgeBase()
-    matches = list(kb.query('rel', '?X', '?Y'))
+    matches = list(kb.query('rel', '?X', '?Y', ext_symbols=False))
     assert len(matches) == 0
 
 
@@ -71,7 +78,7 @@ def test_query_multiple_facts():
     kb.fact('rel', 'arg1', 'arg2')
     kb.fact('rel', 'arg1', 'arg3')
     kb.fact('rel', 'arg2', 'irrelevant')
-    matches = list(kb.query('rel', 'arg1', '?Y'))
+    matches = list(kb.query('rel', 'arg1', '?Y', ext_symbols=False))
     matches = list(
         {
             var.symbol: val.symbol
@@ -99,7 +106,7 @@ def test_inference():
         ('parent', '?parent', '?child'),
     )
     kb.fact('parent', 'Alice', 'Bob')
-    m = kb.query('child', 'Bob', 'Alice')
+    m = kb.query('child', 'Bob', 'Alice', ext_symbols=False)
     m = list(m)
     assert len(m) == 1
     assert len(m[0]) == 0

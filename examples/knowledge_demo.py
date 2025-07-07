@@ -1,6 +1,10 @@
 from pychology.knowledge import KnowledgeBase
 
 
+def state_fact(*args):
+    kb.fact(*args)
+    print(f"Asserting: {args[0]}({', '.join(args[1:])})")
+
 def make_query(*args):
     relation, arguments = args[0], args[1:]
     print(f"Query: {relation}({', '.join(arguments)})")
@@ -16,45 +20,34 @@ def make_query(*args):
                     print(f"* {variable}: {value}")
                 else:
                     print(f"  {variable}: {value}")
+    print()
 
 
 kb = KnowledgeBase()
-kb.fact('parent', 'Alice', 'Bob')
-kb.fact('parent', 'Bob', 'Claudia')
-kb.fact('parent', 'Claudia', 'Damien')
-kb.fact('parent', 'Damien', 'Eve')
-kb.fact('parent', 'Niemand', 'Niemand')
-print(kb)
-print()
-make_query('parent', 'Alice', '?child')
-print()
-make_query('parent', '?parent', 'Eve')
-print()
-make_query('parent', 'Alice', 'Bob')
-print()
-make_query('parent', 'Alice', 'Eve')
-print()
-make_query('parent', '?selfcreator', '?selfcreator')
-print()
-
-
-print("--- Querying non-recursive rules ---")
 kb.rule(
     ('ancestor', '?X', '?Y'),
     ('parent', '?X', '?Y'),
 )
-print(kb)
-print()
-make_query('ancestor', '?ancestor', 'Eve')
-print()
-
-
-print("--- Querying recursive rules ---")
 kb.rule(
     ('ancestor', '?X', '?Y'),
     ('parent', '?Z', '?Y'),
     ('ancestor', '?X', '?Z'),
 )
+print("KnowledgeBase state:")
 print(kb)
 print()
+state_fact('parent', 'Alice', 'Bob')
+state_fact('parent', 'Bob', 'Claudia')
+state_fact('parent', 'Claudia', 'Damien')
+state_fact('parent', 'Damien', 'Eve')
+state_fact('parent', 'Niemand', 'Niemand')
+print()
+print("KnowledgeBase state:")
+print(kb)
+print()
+make_query('parent', 'Alice', '?child')
+make_query('parent', '?parent', 'Eve')
+make_query('parent', 'Alice', 'Bob')
+make_query('parent', 'Alice', 'Eve')
+make_query('parent', '?selfcreator', '?selfcreator')
 make_query('ancestor', '?ancestor', 'Eve')
