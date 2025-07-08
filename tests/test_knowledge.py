@@ -34,7 +34,7 @@ def test_fact_storage():
 
 def test_kb_rejects_duplicate_facts():
     kb = KnowledgeBase()
-    assert kb.fact('rel', 'arg1', 'arg2')
+    assert kb.fact('rel', 'arg1', 'arg2') is not False
     assert not kb.fact('rel', 'arg1', 'arg2')
     assert len(kb.facts[kb.relations['rel']]) == 1
 

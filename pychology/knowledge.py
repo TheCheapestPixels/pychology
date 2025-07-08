@@ -240,8 +240,7 @@ class KnowledgeBase:
         if not self._assert_fact(fact):
             return False
         sv.commit()
-        self._infer()
-        return True
+        return self._infer()
 
     def _unify_atom_and_fact(self, atom, fact, substitutions=None):
         assert atom.relation is fact.relation
@@ -314,11 +313,17 @@ class KnowledgeBase:
             sv = SymbolView(self)  # We don't want to pollute the KB.
             query = Atom(sv, atom_or_relation, arguments)
         relation = query.relation
-        for unification in self._unify_atom_and_all_facts(query):
-            if ext_symbols:
-                yield {variable.symbol: value.symbol for variable, value in unification.items()}
-            else:
-                yield unification
+        unifications = self._unify_atom_and_all_facts(query)
+        if ext_symbols:
+            return [
+                {
+                    variable.symbol: value.symbol
+                    for variable, value in unification.items()
+                }
+                for unification in unifications
+            ]
+        else:
+            return list(unifications)
 
     def rule(self, *atoms):
         sv = SymbolView(self)
@@ -329,9 +334,10 @@ class KnowledgeBase:
         else:
             self.rules[relation] = [rule]
         sv.commit()
-        self._infer()
+        return self._infer()
 
     def _infer(self):
+        added_facts = []
         new_facts = True
         while new_facts:
             new_facts = False
@@ -350,6 +356,8 @@ class KnowledgeBase:
                         if self._assert_fact(fact):
                             sv.commit()
                             new_facts = True
+                            added_facts.append(fact)
+        return added_facts
 
     def __repr__(self):
         fact_strs = []
