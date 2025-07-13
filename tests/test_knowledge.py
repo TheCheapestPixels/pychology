@@ -110,3 +110,110 @@ def test_inference():
     m = list(m)
     assert len(m) == 1
     assert len(m[0]) == 0
+
+
+def test_save():
+    kb = KnowledgeBase()
+    kb.rule(
+        ('child', '?child', '?parent'),
+        ('parent', '?parent', '?child'),
+    )
+    kb.fact('parent', 'Alice', 'Bob')
+    knowledge = kb.save()
+    expected_knowledge = {
+        'facts': [  # FIXME: Order of facts may vary.
+            ('parent', 'Alice', 'Bob'),
+            ('child', 'Bob', 'Alice'),
+        ],
+        'rules': [
+            [  # FIXME: Order of rules may vary, too, even that of body clauses.
+                ('child', '?child', '?parent'),
+                ('parent', '?parent', '?child'),
+            ],
+        ],
+    }
+    assert knowledge == expected_knowledge
+
+
+def test_load_without_inference():
+    given_knowledge = {
+        'facts': [
+            ('parent', 'Alice', 'Bob'),
+        ],
+        'rules': [
+            [
+                ('child', '?child', '?parent'),
+                ('parent', '?parent', '?child'),
+            ],
+        ],
+    }
+    kb = KnowledgeBase()
+    kb.load(given_knowledge, infer=False)
+    # Are the facts correct? There should be one relation, and it should
+    # have one element.
+    assert len(kb.facts) == 1
+    assert len(kb.facts[kb.relations['parent']]) == 1
+    # Is that the fact that we gave it?
+    fact = kb.facts[kb.relations['parent']][0]
+    assert fact.relation.symbol == 'parent'
+    assert fact.arguments[0].symbol == 'Alice'
+    assert fact.arguments[1].symbol == 'Bob'
+    # And the rules?
+    assert len(kb.rules) == 1
+    rule = kb.rules[kb.relations['child']][0]
+    # Let's doublecheck the head.
+    head = rule.head
+    assert head.relation.symbol == 'child'
+    assert head.arguments[0].symbol == '?child'
+    assert head.arguments[1].symbol == '?parent'
+    # Now for the body.
+    assert len(rule.body) == 1
+    body = rule.body[0]
+    assert body.relation.symbol == 'parent'
+    assert body.arguments[0].symbol == '?parent'
+    assert body.arguments[1].symbol == '?child'
+
+
+def test_load_with_inference():
+    given_knowledge = {
+        'facts': [
+            ('parent', 'Alice', 'Bob'),
+        ],
+        'rules': [
+            [
+                ('child', '?child', '?parent'),
+                ('parent', '?parent', '?child'),
+            ],
+        ],
+    }
+    kb = KnowledgeBase()
+    kb.load(given_knowledge, infer=True)
+    # Are the facts correct?
+    # There should be one each of parent and child relation.
+    assert len(kb.facts) == 2
+    assert len(kb.facts[kb.relations['parent']]) == 1
+    assert len(kb.facts[kb.relations['child']]) == 1
+    # Is the parent fact correct?
+    fact = kb.facts[kb.relations['parent']][0]
+    assert fact.relation.symbol == 'parent'
+    assert fact.arguments[0].symbol == 'Alice'
+    assert fact.arguments[1].symbol == 'Bob'
+    # Is the child fact correct?
+    fact = kb.facts[kb.relations['child']][0]
+    assert fact.relation.symbol == 'child'
+    assert fact.arguments[0].symbol == 'Bob'
+    assert fact.arguments[1].symbol == 'Alice'
+    # The rule check is the same as for loading without inference.
+    assert len(kb.rules) == 1
+    rule = kb.rules[kb.relations['child']][0]
+    # Head
+    head = rule.head
+    assert head.relation.symbol == 'child'
+    assert head.arguments[0].symbol == '?child'
+    assert head.arguments[1].symbol == '?parent'
+    # Body
+    assert len(rule.body) == 1
+    body = rule.body[0]
+    assert body.relation.symbol == 'parent'
+    assert body.arguments[0].symbol == '?parent'
+    assert body.arguments[1].symbol == '?child'

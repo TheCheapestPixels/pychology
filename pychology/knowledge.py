@@ -19,7 +19,7 @@
 #     ('male', Variable('UNCLE')),
 # )
 # ```
-# The first line specifiess the inferable fact, and the following ones
+# The first line specifies the inferable fact, and the following ones
 # define the inference itself. When the knowledge base is now queried
 # with "Who is your uncle?"
 # `kb.query('uncle', Variable('UNCLE'), 'you')`
@@ -325,7 +325,7 @@ class KnowledgeBase:
         else:
             return list(unifications)
 
-    def rule(self, *atoms):
+    def rule(self, *atoms, infer=True):
         sv = SymbolView(self)
         rule = Rule(sv, atoms)
         relation = rule.head.relation
@@ -334,7 +334,8 @@ class KnowledgeBase:
         else:
             self.rules[relation] = [rule]
         sv.commit()
-        return self._infer()
+        if infer:
+            return self._infer()
 
     def _infer(self):
         added_facts = []
@@ -358,6 +359,41 @@ class KnowledgeBase:
                             new_facts = True
                             added_facts.append(fact)
         return added_facts
+
+    def save(self):
+        knowledge = dict(
+            facts=[],
+            rules=[],
+        )
+
+        def symbolize_clause(clause):
+            relation = clause.relation.symbol
+            args = [arg.symbol for arg in clause.arguments]
+            return (relation, *args)
+
+        for fact_list in self.facts.values():
+            for fact in fact_list:
+                knowledge['facts'].append(symbolize_clause(fact))
+        for rule_list in self.rules.values():
+            for rule in rule_list:
+                symbolic_head = symbolize_clause(rule.head)
+                symbolic_body = [
+                    symbolize_clause(clause)
+                    for clause in rule.body
+                ]
+                knowledge['rules'].append(
+                    [symbolic_head, *symbolic_body]
+                )
+
+        return knowledge
+
+    def load(self, knowledge, infer=True):
+        for fact in knowledge['facts']:
+            self.fact(*fact, infer=False)
+        for rule in knowledge['rules']:
+            self.rule(*rule, infer=False)
+        if infer:
+            self._infer()
 
     def __repr__(self):
         fact_strs = []
