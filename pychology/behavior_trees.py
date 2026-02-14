@@ -228,7 +228,10 @@ class SaveableFunction:
         return self.func(*args, **kwargs)
 
     def _save(self):
-        return self.name
+        return dict(
+            cls=self.pych_cls,
+            name=self.name,
+        )
 
 
 class ActionFunction(SaveableFunction):
@@ -239,13 +242,23 @@ class ConditionFunction(SaveableFunction):
     pych_cls = 'TLConditionFunction'
 
 
+function_classes = [
+    SaveableFunction,
+    ActionFunction,
+    ConditionFunction,
+]
+
+
 # Now we can throw all our `SaveableFunction`s into a loader, and let
 # that recreate our tree from the data structure that `bt._save()`
 # returned.
 class BehaviorTreeLoader:
     def __init__(self, *action_funcs):
         self.funcs = {af.name: af for af in action_funcs}
-        self.classes  = {cls.pych_cls: cls for cls in node_classes}
+        self.classes  = {
+            cls.pych_cls: cls
+            for cls in node_classes + function_classes
+        }
 
     def load(self, tree_data):
         top_level_cls = tree_data['cls']
@@ -255,8 +268,10 @@ class BehaviorTreeLoader:
         bt = cls(*args, *children, **kwargs)
         return bt
 
-    def get_func(self, func_name):
-        return self.funcs[func_name]
+    def get_func(self, func_data):
+        cls = func_data['cls']
+        name = func_data['name']
+        return self.classes[cls](self.funcs[name], name=name)
 
 
 ### Behavior Trees

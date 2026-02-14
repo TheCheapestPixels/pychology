@@ -2,7 +2,9 @@ import pytest
 
 from pychology.behavior_trees import NodeState
 from pychology.behavior_trees import BehaviorTreeLoader
+from pychology.behavior_trees import SaveableFunction
 from pychology.behavior_trees import ActionFunction
+from pychology.behavior_trees import ConditionFunction
 
 from pychology.behavior_trees import BehaviorTree
 
@@ -55,7 +57,7 @@ def test_action_save():
     bt_data = bt._save()
     assert bt_data == dict(
         cls='BTAction',
-        func='demo_action',
+        func={'cls': 'TLActionFunction', 'name': 'demo_action'},
         pass_entity=True,
     )
 
@@ -71,7 +73,7 @@ def test_action_load():
     
     bt_data = dict(
         cls='BTAction',
-        func='demo_action',
+        func={'cls': 'TLActionFunction', 'name': 'demo_action'},
         pass_entity=True,
     )
 
@@ -104,7 +106,7 @@ def loader_with_dummy_action():
     loader = BehaviorTreeLoader(wrapper)
     data = dict(
         cls='BTAction',
-        func='demo_action',
+        func={'cls': 'TLActionFunction', 'name': 'demo_action'},
         pass_entity=True,
     )
     return loader, wrapper, data
@@ -114,14 +116,20 @@ def loader_with_dummy_action():
 def loader_with_dummy_action_and_condition():
     def action_func(*args, **kwargs):
         return NodeState.DONE
-    action_wrapper = ActionFunction(action_func, name='demo_action')
+    action_wrapper = ActionFunction(
+        action_func,
+        name='demo_action',
+    )
     def condition_func(*args, **kwargs):
         return True
-    condition_wrapper = ActionFunction(condition_func, name='demo_condition')
+    condition_wrapper = ConditionFunction(
+        condition_func,
+        name='demo_condition',
+    )
     loader = BehaviorTreeLoader(action_wrapper, condition_wrapper)
     action_data = dict(
         cls='BTAction',
-        func='demo_action',
+        func={'cls': 'TLActionFunction', 'name': 'demo_action'},
         pass_entity=True,
     )
     return loader, action_wrapper, condition_wrapper, action_data
@@ -185,11 +193,6 @@ def test_returndecorators_saveload(loader_with_dummy_action, cls):
 
 def test_rewrite_return_values_saveload(loader_with_dummy_action):
     loader, dummy_action, dummy_action_data = loader_with_dummy_action
-    dummy_action_data = dict(
-        cls='BTAction',
-        func='demo_action',
-        pass_entity=True,
-    )
 
     bt = RewriteReturnValues(
         NodeState.ACTIVE, NodeState.DONE, NodeState.FAILED,
@@ -223,7 +226,7 @@ def test_condition_decorators_saveload(loader_with_dummy_action_and_condition, c
     assert bt_data == dict(
         cls=cls.pych_cls,
         child=dummy_action_data,
-        cond='demo_condition'
+        cond={'cls': 'TLConditionFunction', 'name': 'demo_condition'}
     )
     new_bt = loader.load(bt_data)
     assert isinstance(bt, cls)
@@ -260,21 +263,18 @@ def test_rewrite_arguments_saveload(loader_with_dummy_action):
     action_func_obj = ActionFunction(action_func, name='demo_action')
     def rewrite_func(*args, **kwargs):
         return args, kwargs
-    rewrite_func_obj = ActionFunction(rewrite_func, name='demo_rewrite')
-    loader = BehaviorTreeLoader(action_func_obj, rewrite_func_obj)
-
-    dummy_action_data = dict(
-        cls='BTAction',
-        func='demo_action',
-        pass_entity=True,
+    rewrite_func_obj = SaveableFunction(
+        rewrite_func,
+        name='demo_rewrite',
     )
+    loader = BehaviorTreeLoader(action_func_obj, rewrite_func_obj)
 
     bt = RewriteArguments(rewrite_func_obj, Action(dummy_action))
     bt_data = bt._save()
     assert bt_data == dict(
         cls='BTRewriteArguments',
         child=dummy_action_data,
-        func='demo_rewrite',
+        func={'cls': 'TLSaveableFunction', 'name': 'demo_rewrite'},
     )
     new_bt = loader.load(bt_data)
     assert isinstance(bt, RewriteArguments)
