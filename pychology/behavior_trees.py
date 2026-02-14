@@ -44,7 +44,11 @@ Node
 |  +- Chain: Run one tree after another until each is DONE. Return FAILED if any tree fails.
 |  +- Priorities: Run trees in order until one does not return FAILED.
 |  +- Parallel: Run all trees, fail if any has FAILED, succeed when all are DONE.
-+- Action(action_func): Run the action_func
++- Leaf
+   +- Action(action_func): Run the action_func
+   +- ReturnActive: Returns ACTIVE.
+   +- ReturnDone: Returns DONE.
+   +- ReturnFailed: Returns FAILED.
 """
 
 
@@ -65,9 +69,199 @@ class NodeState(enum.Enum):
     DONE = 3
 
 
+### De-/Serialization
+
+state_to_name_map = {
+    NodeState.FAILED: 'FAILED',
+    NodeState.ACTIVE: 'ACTIVE',
+    NodeState.DONE: 'DONE',
+}
+def state_to_name(state):
+    return state_to_name_map[state]
+name_to_state_map = {
+    name: state
+    for state, name in state_to_name_map.items()
+}
+def name_to_state(name):
+    return name_to_state_map[name]
+
+
+# These classes are mixed in with the node type hierarchy laid out
+# above:
+# BTSaveBase: Runs the serialization process. 
+# +- BTSaveNone: Base class for leaf nodes, which have no children
+# +- BTSaveSingle: Base class for decorators, which have exactly one child
+# +- BTSaveMulti: Base class for multinodes, which have a list of children
+#
+# They take care of representing a node's children; This makes it
+# necessary though to conform to the convention that a node's children
+# are an arbitrary number of args passed to the node's `__init__` after
+# all other arguments.
+# The node itself (or one that the node inherits from) still has to
+# implement how to de-/serialize the node's own data (both static and
+# state), if it carries any; If they don't, then `BTSaveBase`'s suffice.
+# Specifically, `_save_data` turns the node's state into a dictionary,
+# while `_load_data`turns that dict back into the args and kwargs passed
+# to the `__init__` of the node class.
+#
+# class Example(BTSaveMulti):
+#     def __init__(self, first_arg, *children, node_state=None):
+#         self.first_arg = first_arg
+#         self.node_state = node_state
+#         // ...
+#
+#     def _save_data(self, with_state=False):
+#         node_data = dict(
+#             name_in_data_structure=self.first_arg,
+#         )
+#         if with_state:
+#             node_data.update(dict(state=self.node_state))
+#         return node_data
+# 
+#     @classmethod
+#     def _load_data(cls, loader, node_data, with_state=False):
+#         args = [node_data['name_in_data_structure']]
+#         kwargs = dict()
+#         if with_state:
+#             kwargs.update(node_state=node_data['state'])
+#         return args, kwargs
+
+class BTSaveBase:
+    def _save(self, with_state=False):
+        data = dict(
+            cls=self.pych_cls,
+        )
+        data.update(self._save_data(with_state=with_state))
+        data.update(self._save_children(with_state=with_state))
+        return data
+
+    def _save_data(self, with_state=False):
+        """
+        Turn a node's configuration (apart from its children) into a
+        dictionary.
+
+        Overwrite this method on node types that do store any data.
+        """
+        return dict()
+
+    @classmethod
+    def _load(cls, loader, node_data):
+        args, kwargs = cls._load_data(loader, node_data)
+        children = cls._load_children(loader, node_data)
+        return cls(*args, *children, **kwargs)
+
+    @classmethod
+    def _load_data(cls, loader, node_data):
+        """
+        Extracts the positional and keyword arguments (except for 
+        children) to use on instantiation.
+
+        Overwrite this where you also overwrite _save_data, as that 
+        produces the data that is extracted again here.
+        """
+        return [], {}
+
+
+class BTSaveNone(BTSaveBase):
+    def _save_children(self, with_state=False):
+        return []
+
+    @classmethod
+    def _load_children(cls, loader, node_data):
+        return []
+
+
+class BTSaveSingle(BTSaveBase):
+    def _save_children(self, with_state=False):
+        return dict(
+            child=self.tree._save(with_state=with_state)
+        )
+
+    @classmethod
+    def _load_children(cls, loader, node_data):
+        return [loader.load(node_data['child'])]
+
+
+class BTSaveMulti(BTSaveBase):
+    def _save_children(self, with_state=False):
+        return dict(
+            children=[
+                c._save(with_state=with_state)
+                for c in self.children
+            ]
+        )
+
+    @classmethod
+    def _load_children(cls, loader, node_data):
+        return [loader.load(c) for c in node_data['children']]
+
+
+# Since we can't save the functions that our AIs use, we do the next
+# best thing: Save names referencing the functions. For this, we've got
+# this little helper class that simply wraps any arbitrary function that
+# we throw into it, and takes a name that we can reference.
+# However, we can do one better: By having multiple types of saveable
+# functions, we can indicate to other tools, e.g. an AI debugger, what
+# the role of the function is, and therefore what protocols it will
+# adhere to.
+#
+# SaveableFunction
+# +- ActionFunction: Returns a `NodeState`
+# +- ConditionFunction: Returns `True` or `False`
+
+class SaveableFunction:
+    pych_cls = 'TLSaveableFunction'
+
+    """
+    Wrapper for functions, so that they can be referenced during
+    de-/serialization.
+
+    saveable_func = ActionFunction(basic_behavior_func, name='foo')
+    bt = Action(saveable_func)
+    bt._save()
+    """
+    def __init__(self, func, name):
+        self.func = func
+        self.name = name
+
+    def __call__(self, *args, **kwargs):
+        return self.func(*args, **kwargs)
+
+    def _save(self):
+        return self.name
+
+
+class ActionFunction(SaveableFunction):
+    pych_cls = 'TLActionFunction'
+
+
+class ConditionFunction(SaveableFunction):
+    pych_cls = 'TLConditionFunction'
+
+
+# Now we can throw all our `SaveableFunction`s into a loader, and let
+# that recreate our tree from the data structure that `bt._save()`
+# returned.
+class BehaviorTreeLoader:
+    def __init__(self, *action_funcs):
+        self.funcs = {af.name: af for af in action_funcs}
+        self.classes  = {cls.pych_cls: cls for cls in node_classes}
+
+    def load(self, tree_data):
+        top_level_cls = tree_data['cls']
+        cls = self.classes[top_level_cls]
+        args, kwargs = cls._load_data(self, tree_data)
+        children = cls._load_children(self, tree_data)
+        bt = cls(*args, *children, **kwargs)
+        return bt
+
+    def get_func(self, func_name):
+        return self.funcs[func_name]
+
+
 ### Behavior Trees
 
-class BehaviorTree:
+class BehaviorTree(BTSaveSingle):
     """
     To make an entity behave the way that is defined by a BehaviorTree,
     call the tree with the entity and any relevant normal and keyword
@@ -83,6 +277,8 @@ class BehaviorTree:
     `done` method and returns what it returns. This is a base class, so
     you will have to override the done method to serve your needs. 
     """
+    pych_cls = 'BTBehaviorTree'
+
     def __init__(self, tree):
         self.tree = tree
         self.tree.reset()
@@ -120,7 +316,7 @@ class Node:
 
 ### Decorators
 
-class Decorator(Node):
+class Decorator(Node, BTSaveSingle):
     """
     Decorators are inner nodes of the behavior tree that let the 
     designer add preconditions and postconditions, change the NodeState
@@ -135,7 +331,18 @@ class Decorator(Node):
 
 # Debug Decorators
 
-class DebugPrint(Decorator):
+class DebugPrintBase(Decorator):
+    def _save_data(self, with_state=False):
+        return dict(text=self.text)
+
+    @classmethod
+    def _load_data(cls, loader, node_data):
+        return [node_data['text']], {}
+
+
+class DebugPrint(DebugPrintBase):
+    pych_cls = 'BTDebugPrint'
+
     def __init__(self, text, tree):
         self.text = text
         self.tree = tree
@@ -145,11 +352,13 @@ class DebugPrint(Decorator):
         return self.tree(entity, *args, **kwargs)
 
 
-class DebugPrintOnEnter(Decorator):
-    def __init__(self, text, tree):
+class DebugPrintOnEnter(DebugPrintBase):
+    pych_cls = 'BTDebugPrintOnEnter'
+
+    def __init__(self, text, tree, fresh=True):
         self.text = text
         self.tree = tree
-        self.fresh = True
+        self.fresh = fresh
 
     def __call__(self, entity, *args, **kwargs):
         if self.fresh:
@@ -162,7 +371,9 @@ class DebugPrintOnEnter(Decorator):
         super().reset()
 
 
-class DebugPrintOnReset(Decorator):
+class DebugPrintOnReset(DebugPrintBase):
+    pych_cls = 'BTDebugPrintOnReset'
+
     def __init__(self, text, tree):
         self.text = text
         self.tree = tree
@@ -175,6 +386,8 @@ class DebugPrintOnReset(Decorator):
 # Argument rewriting
 
 class RewriteArguments(Decorator):
+    pych_cls = 'BTRewriteArguments'
+
     def __init__(self, rewrite_func, tree):
         self.rewrite_func = rewrite_func
         self.tree = tree
@@ -182,6 +395,13 @@ class RewriteArguments(Decorator):
     def __call__(self, entity, *args, **kwargs):
         new_args, new_kwargs = self.rewrite_func(*args, **kwargs)
         return self.tree(entity, *new_args, **new_kwargs)
+
+    def _save_data(self, with_state=False):
+        return dict(func=self.rewrite_func._save())
+
+    @classmethod
+    def _load_data(cls, loader, node_data, with_state=False):
+        return [loader.get_func(node_data['func'])], dict()
 
 
 # Return value rewriting
@@ -210,9 +430,12 @@ class ReturnValueAlways(Decorator):
         return self.reaction()
 
 
-class ReturnActiveAlways(ReturnValueAlways, ActiveOnCondition): pass
-class ReturnDoneAlways(ReturnValueAlways, DoneOnCondition): pass
-class ReturnFailedAlways(ReturnValueAlways, FailOnCondition): pass
+class ReturnActiveAlways(ReturnValueAlways, ActiveOnCondition):
+    pych_cls = 'BTReturnActiveAlways'
+class ReturnDoneAlways(ReturnValueAlways, DoneOnCondition):
+    pych_cls = 'BTReturnDoneAlways'
+class ReturnFailedAlways(ReturnValueAlways, FailOnCondition):
+    pych_cls = 'BTReturnFailedAlways'
 
 
 class ReturnValueOnValue(Decorator):
@@ -253,15 +476,23 @@ class ReturnValueOnFailed(ReturnValueOnValue):
         return self.reaction()
 
 
-class ReturnFailedOnActive(ReturnValueOnActive, FailOnCondition): pass
-class ReturnDoneOnActive(ReturnValueOnActive, DoneOnCondition): pass
-class ReturnActiveOnDone(ReturnValueOnDone, ActiveOnCondition): pass
-class ReturnFailedOnDone(ReturnValueOnDone, FailOnCondition): pass
-class ReturnActiveOnFailed(ReturnValueOnFailed, ActiveOnCondition): pass
-class ReturnDoneOnFailed(ReturnValueOnFailed, DoneOnCondition): pass
+class ReturnFailedOnActive(ReturnValueOnActive, FailOnCondition):
+    pych_cls = 'BTReturnFailedOnActive'
+class ReturnDoneOnActive(ReturnValueOnActive, DoneOnCondition):
+    pych_cls = 'BTReturnDoneOnActive'
+class ReturnActiveOnDone(ReturnValueOnDone, ActiveOnCondition):
+    pych_cls = 'BTReturnActiveOnDone'
+class ReturnFailedOnDone(ReturnValueOnDone, FailOnCondition):
+    pych_cls = 'BTReturnFailedOnDone'
+class ReturnActiveOnFailed(ReturnValueOnFailed, ActiveOnCondition):
+    pych_cls = 'BTReturnActiveOnFailed'
+class ReturnDoneOnFailed(ReturnValueOnFailed, DoneOnCondition):
+    pych_cls = 'BTReturnDoneOnFailed'
 
 
 class RewriteReturnValues(Decorator):
+    pych_cls = 'BTRewriteReturnValues'
+
     def __init__(self, active, done, failed, tree):
         self.on_active = active
         self.on_done = done
@@ -276,6 +507,20 @@ class RewriteReturnValues(Decorator):
             return self.on_active
         else:  # rv == NodeState.FAILED:
             return self.on_failed
+
+    def _save_data(self, with_state=False):
+        return dict(
+            on_active=state_to_name(self.on_active),
+            on_done=state_to_name(self.on_done),
+            on_failed=state_to_name(self.on_failed),
+        )
+    @classmethod
+    def _load_data(cls, loader, node_data, woth_state=False):
+        return [
+            name_to_state(node_data['on_active']),
+            name_to_state(node_data['on_done']),
+            name_to_state(node_data['on_failed']),            
+        ], {}
 
 
 # Condition Decorators
@@ -307,6 +552,14 @@ class Condition(Decorator):
         self.condition = condition
         self.tree = tree
 
+    def _save_data(self, with_state=False):
+        return dict(cond=self.condition._save())
+
+    @classmethod
+    def _load_data(cls, loader, node_data, woth_state=False):
+        func = loader.get_func(node_data['cond'])        
+        return [func], {}
+
 
 class Precondition(Condition):
     def __call__(self, entity, *args, **kwargs):
@@ -323,25 +576,45 @@ class Postcondition(Condition):
         return rv
     
 
-class FailOnPrecondition(Precondition, FailOnCondition): pass
-class ActiveOnPrecondition(Precondition, ActiveOnCondition): pass
-class DoneOnPrecondition(Precondition, DoneOnCondition): pass
-class FailOnPostcondition(Postcondition, FailOnCondition): pass
-class ActiveOnPostcondition(Postcondition, ActiveOnCondition): pass
-class DoneOnPostcondition(Postcondition, DoneOnCondition): pass
+class FailOnPrecondition(Precondition, FailOnCondition):
+    pych_cls = 'BTFailOnPrecondition'
+class ActiveOnPrecondition(Precondition, ActiveOnCondition):
+    pych_cls = 'BTActiveOnPrecondition'
+class DoneOnPrecondition(Precondition, DoneOnCondition):
+    pych_cls = 'BTDoneOnPrecondition'
+class FailOnPostcondition(Postcondition, FailOnCondition):
+    pych_cls = 'BTFailOnPostcondition'
+class ActiveOnPostcondition(Postcondition, ActiveOnCondition):
+    pych_cls = 'BTActiveOnPostcondition'
+class DoneOnPostcondition(Postcondition, DoneOnCondition):
+    pych_cls = 'BTDoneOnPostcondition'
 
 
 # Counter Decorators
 
 class Counter(Decorator):
-    def __init__(self, timeout, tree):
-        self.counter = 0
+    def __init__(self, timeout, tree, counter=0):
+        self.counter = counter
         self.timeout = timeout
         self.tree = tree
 
     def reset(self):
         self.counter = 0
         self.tree.reset()
+
+    def _save_data(self, with_state=False):
+        data = dict(timeout=self.timeout)
+        if with_state:
+            data.update(dict(counter=self.counter))
+        return data
+
+    @classmethod
+    def _load_data(cls, loader, node_data, with_state=False):
+        timeout = node_data['timeout']
+        kwargs = {}
+        if with_state:
+            kwargs['counter'] = node_data['counter']
+        return [timeout], kwargs
 
 
 class Precounter(Counter):
@@ -361,29 +634,47 @@ class Postcounter(Counter):
         return rv
 
 
-class FailOnPrecounter(Precounter, FailOnCondition): pass
-class ActiveOnPrecounter(Precounter, ActiveOnCondition): pass
-class DoneOnPrecounter(Precounter, DoneOnCondition): pass
-class FailOnPostcounter(Postcounter, FailOnCondition): pass
-class ActiveOnPostcounter(Postcounter, ActiveOnCondition): pass
-class DoneOnPostcounter(Postcounter, DoneOnCondition): pass
+class FailOnPrecounter(Precounter, FailOnCondition):
+    pych_cls = 'BTFailOnPrecounter'
+class ActiveOnPrecounter(Precounter, ActiveOnCondition):
+    pych_cls = 'BTActiveOnPrecounter'
+class DoneOnPrecounter(Precounter, DoneOnCondition):
+    pych_cls = 'BTDoneOnPrecounter'
+class FailOnPostcounter(Postcounter, FailOnCondition):
+    pych_cls = 'BTFailOnPostcounter'
+class ActiveOnPostcounter(Postcounter, ActiveOnCondition):
+    pych_cls = 'BTActiveOnPostcounter'
+class DoneOnPostcounter(Postcounter, DoneOnCondition):
+    pych_cls = 'BTDoneOnPostcounter'
 
 
 # Multinodes
 
-class Multinode(Node):
+class Multinode(Node, BTSaveMulti):
     """
     Multinodes are inner nodes of a behavior trees that have multiple
     children. For practical applications, see Chain and Priorities.
     """
-    def __init__(self, *children):
+    def __init__(self, *children, active_child=None):
+        self.active_child = active_child
         self.children = children
-        self.active_child = None
-        self.past_child = None
 
     def reset(self):
         for child in self.children:
             child.reset()
+
+    def _save_data(self, with_state=False):
+        data = dict()
+        if with_state:
+            data.update(dict(active=self.active_child))
+        return data
+
+    @classmethod
+    def _load_data(cls, loader, node_data, with_state=False):
+        kwargs = dict()
+        if with_state:
+            kwargs.update(dict(active_child=node_data['active']))
+        return [], kwargs
 
 
 class Chain(Multinode):
@@ -396,6 +687,8 @@ class Chain(Multinode):
     ACTIVE. When it returns DONE, the Chain moves on to the next node,
     and so on. When the last child is DONE, so is the Chain.
     """
+    pych_cls = 'BTChain'
+
     def __call__(self, entity, *args, **kwargs):
         if self.active_child is None:
             self.active_child = 0
@@ -426,9 +719,7 @@ class Priorities(Multinode):
     has not FAILED. If all fail, so does this node, otherwise it returns
     what the successful node returns (ACTIVE or DONE).
     """
-    def __init__(self, *children):
-        self.active_child = None
-        self.children = children
+    pych_cls = 'BTPriorities'
 
     def __call__(self, entity, *args, **kwargs):
         for idx, child in enumerate(self.children):
@@ -452,6 +743,11 @@ class Parallel(Multinode):
     all of them on each tick. If any of them fail, this node returns
     FAILED, and when all children are finished, it returns DONE.
     """
+    pych_cls = 'BTParallel'
+
+    # Parallel is an atypical Multinode as it does not have an active
+    # child node; All its children are active all the time. That's why
+    # we overwrite __init__, _save_data and _load_data again.
     def __init__(self, *children):
         self.children = children
 
@@ -471,15 +767,23 @@ class Parallel(Multinode):
         for child in self.children:
             child.reset()
 
+    def _save_data(self, with_state=False):
+        return dict()
+
+    @classmethod
+    def _load_data(cls, loader, node_data, with_state=False):
+        return [], {}
+
 
 ### Leaves of the tree
 
-class Leaf(Node):
+class Leaf(Node, BTSaveNone):
     def reset(self):
         pass
 
 
 class Action(Leaf):
+    pych_cls = 'BTAction'
     """
     Action nodes (usually called Tasks) wrap atomic behavior. They are
     the leaves of the behavior tree and have no children.
@@ -511,6 +815,18 @@ class Action(Leaf):
             raise Exception(f"Action function must return a NodeState, but returned:\n{rv}\n")
         return rv
 
+    def _save_data(self, with_state=False):
+        return dict(
+            func=self.func._save(),
+            pass_entity=self.pass_entity,
+        )
+
+    @classmethod
+    def _load_data(cls, loader, node_data):
+        func = loader.get_func(node_data['func'])
+        pass_entity = node_data['pass_entity']
+        return [func], dict(pass_entity=pass_entity)
+
 
 class ReturnValue(Leaf):
     def __call__(self, entity, *args, **kwargs):
@@ -518,12 +834,32 @@ class ReturnValue(Leaf):
 
 
 class ReturnActive(ReturnValue):
+    pych_cls = 'BTReturnActive'
     return_value = NodeState.ACTIVE
 
 
 class ReturnDone(ReturnValue):
+    pych_cls = 'BTReturnDone'
     return_value = NodeState.DONE
 
 
 class ReturnFailed(ReturnValue):
+    pych_cls = 'BTReturnFailed'
     return_value = NodeState.FAILED
+
+
+node_classes = [
+    BehaviorTree,
+    DebugPrint, DebugPrintOnEnter, DebugPrintOnReset,
+    ReturnActiveAlways, ReturnDoneAlways, ReturnFailedAlways,
+    ReturnFailedOnActive, ReturnDoneOnActive, ReturnActiveOnDone, 
+    ReturnFailedOnDone, ReturnActiveOnFailed, ReturnDoneOnFailed,
+    RewriteReturnValues,
+    FailOnPrecondition, ActiveOnPrecondition, DoneOnPrecondition,
+    FailOnPostcondition, ActiveOnPostcondition, DoneOnPostcondition,
+    FailOnPrecounter, ActiveOnPrecounter, DoneOnPrecounter,
+    FailOnPostcounter, ActiveOnPostcounter, DoneOnPostcounter,
+    Action, ReturnActive, ReturnDone, ReturnFailed,
+    RewriteArguments,
+    Chain, Priorities, Parallel,
+]
