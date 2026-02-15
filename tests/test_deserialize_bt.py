@@ -241,15 +241,29 @@ counter_decorators = [
 @pytest.mark.parametrize(
     "cls", counter_decorators
 )
-def test_counter_decorators_saveload(loader_with_dummy_action, cls):
+@pytest.mark.parametrize(
+    "with_state", [True, False]
+)
+def test_counter_decorators_saveload(
+        loader_with_dummy_action,
+        cls,
+        with_state,
+):
     loader, dummy_action, dummy_action_data = loader_with_dummy_action
-    bt = cls(3, Action(dummy_action))
-    bt_data = bt._save()
-    assert bt_data == dict(
+    with_state
+    if with_state:
+        bt = cls(3, Action(dummy_action), counter=2)
+    else:
+        bt = cls(3, Action(dummy_action))
+    bt_data = bt._save(with_state=with_state)
+    expected_bt_data = dict(
         cls=cls.pych_cls,
         child=dummy_action_data,
         timeout=3,
     )
+    if with_state:
+        expected_bt_data.update(dict(counter=2))
+    assert expected_bt_data == bt_data
     new_bt = loader.load(bt_data)
     assert isinstance(bt, cls)
 
@@ -282,31 +296,31 @@ def test_rewrite_arguments_saveload(loader_with_dummy_action):
 
 ### Multinodes
 
-def test_chain_saveload(loader_with_dummy_action):
+@pytest.mark.parametrize(
+    "cls", [Chain, Priorities]
+)
+@pytest.mark.parametrize(
+    "with_state", [True, False]
+)
+def test_stateful_multinode_saveload(loader_with_dummy_action, cls, with_state):
     loader, dummy_action, dummy_action_data = loader_with_dummy_action
-    bt = Chain(Action(dummy_action))
-    bt_data = bt._save()
-    assert bt_data == dict(
-        cls='BTChain',
+    if with_state:
+        bt = cls(Action(dummy_action), active_child=1)
+    else:
+        bt = cls(Action(dummy_action))
+    bt_data = bt._save(with_state=with_state)
+    expected_bt_data = dict(
+        cls=cls.pych_cls,
         children=[dummy_action_data],
     )
+    if with_state:
+        expected_bt_data.update(dict(active=1))
+    assert expected_bt_data == bt_data
     new_bt = loader.load(bt_data)
-    assert isinstance(bt, Chain)
+    assert isinstance(bt, cls)
 
 
-def test_priorities_saveload(loader_with_dummy_action):
-    loader, dummy_action, dummy_action_data = loader_with_dummy_action
-    bt = Priorities(Action(dummy_action))
-    bt_data = bt._save()
-    assert bt_data == dict(
-        cls='BTPriorities',
-        children=[dummy_action_data],
-    )
-    new_bt = loader.load(bt_data)
-    assert isinstance(bt, Priorities)
-
-
-def test_priorities_saveload(loader_with_dummy_action):
+def test_parallel_saveload(loader_with_dummy_action):
     loader, dummy_action, dummy_action_data = loader_with_dummy_action
     bt = Parallel(Action(dummy_action))
     bt_data = bt._save()

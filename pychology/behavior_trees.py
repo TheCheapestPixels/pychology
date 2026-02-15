@@ -866,6 +866,7 @@ class ReturnFailed(ReturnValue):
 node_classes = [
     BehaviorTree,
     DebugPrint, DebugPrintOnEnter, DebugPrintOnReset,
+    RewriteArguments,
     ReturnActiveAlways, ReturnDoneAlways, ReturnFailedAlways,
     ReturnFailedOnActive, ReturnDoneOnActive, ReturnActiveOnDone, 
     ReturnFailedOnDone, ReturnActiveOnFailed, ReturnDoneOnFailed,
@@ -875,6 +876,5 @@ node_classes = [
     FailOnPrecounter, ActiveOnPrecounter, DoneOnPrecounter,
     FailOnPostcounter, ActiveOnPostcounter, DoneOnPostcounter,
     Action, ReturnActive, ReturnDone, ReturnFailed,
-    RewriteArguments,
     Chain, Priorities, Parallel,
 ]
